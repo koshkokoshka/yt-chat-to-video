@@ -28,7 +28,7 @@ Convert YouTube Live Chat JSON (.live_chat.json) from [yt-dlp](https://github.co
 2. After the stream download completes, a `<video_id>.live_chat.json` file will appear in the directory.<br>
    Pass this file to the script:
     ```bash
-    python chat-to-video.py [options] <video_id>.live_chat.json -o output.mp4
+    python yt-chat-to-video.py [options] <video_id>.live_chat.json -o output.mp4
     ```
 
 3. When conversion is complete, you'll get an `output.mp4` with rendered live chat

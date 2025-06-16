@@ -2,3 +2,6 @@
 ffmpeg.exe
 *.mp4
 _cache
+*.part
+*.ytdl
+*.json
