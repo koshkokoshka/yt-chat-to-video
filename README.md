@@ -4,8 +4,8 @@ Convert YouTube Live Chat JSON (.live_chat.json) from [yt-dlp](https://github.co
 
 <br/>
 <div align="center">
-   <img alt="screenshot_1" src="https://github.com/koshkokoshka/yt-dlp-chat-to-video/assets/12164048/1267472b-9905-4b83-93f3-14b3a42e2a10" height="280">
-   <img alt="screenshot_2" src="https://github.com/koshkokoshka/yt-dlp-chat-to-video/assets/12164048/e8ca4552-399c-4401-a1da-f9af8182cfde" height="360">
+   <img alt="screenshot_2" src="https://github.com/user-attachments/assets/8565c4a4-9476-4ee1-bd92-251cb88c51f5" height="360">
+   <img alt="screenshot_1" src="https://github.com/user-attachments/assets/fb61df91-08c5-478e-8f19-9113276293d3" height="280">
 </div>
 <br/>
 

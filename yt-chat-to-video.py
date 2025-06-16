@@ -115,7 +115,7 @@ for chat_message in chat_messages:
             if not renderer:
                 continue
             avatar_url = renderer['authorPhoto']['thumbnails'][0]['url']
-            author = renderer['authorName']['simpleText']
+            author = renderer['authorName']['simpleText'] if 'authorName' in renderer else ''
             runs = []
             for run in renderer['message']['runs']:
                 if 'text' in run:
