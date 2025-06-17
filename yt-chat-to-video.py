@@ -84,8 +84,9 @@ cache_folder = "_cache"
 
 # Load chat font
 try:
-    chat_message_font = ImageFont.truetype("fonts/Roboto-Regular.ttf", 13)
-    chat_author_font = ImageFont.truetype("fonts/Roboto-Medium.ttf", 13)
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    chat_message_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Regular.ttf", 13)
+    chat_author_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Medium.ttf", 13)
 except:
     print("\n")
     print("Warning: Can't load chat font. Fallback to default (may look ugly and don't support unicode).")
