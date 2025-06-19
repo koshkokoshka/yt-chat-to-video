@@ -37,20 +37,21 @@ Convert YouTube Live Chat JSON (.live_chat.json) from [yt-dlp](https://github.co
 
 ## Command Line Arguments
 
-| Option               | Description                                 | Default      |
-| -------------------- |---------------------------------------------|--------------|
-| `-o`, `--output`     | Output video file name                      | `output.mp4` |
-| `-w`, `--width`      | Output video width (must be even)           | `400`        |
-| `-h`, `--height`     | Output video height (must be even)          | `540`        |
-| `-r`, `--frame-rate` | Output video framerate                      | `10`         |
-| `-b`, `--background` | Background color in hex                     | `#0f0f0f`    |
-| `-p`, `--padding`    | Inner padding in pixels                     | `24`         |
-| `-s`, `--start`      | Start time (in seconds)                     |              |
-| `-e`, `--end`        | End time (in seconds)                       |              |
-| `--skip-avatars`     | Skip downloading user avatars               |              |
-| `--skip-emojis`      | Skip downloading emojis                     |              |
-| `--no-clip`          | Don\'t clip chat messages at the top        |              |
-| `--cache`            | Cache downloaded avatars and emojis to disk |              |
+| Option               | Description                                            | Default      |
+|----------------------|--------------------------------------------------------|--------------|
+| `-o`, `--output`     | Output video file name                                 | `output.mp4` |
+| `-w`, `--width`      | Output video width (must be even)                      | `400`        |
+| `-h`, `--height`     | Output video height (must be even)                     | `540`        |
+| `-r`, `--frame-rate` | Output video framerate                                 | `10`         |
+| `-b`, `--background` | Background color in hex                                | `#0f0f0f`    |
+| `-p`, `--padding`    | Inner padding in pixels                                | `24`         |
+| `-s`, `--start`      | Start time (in seconds)                                |              |
+| `-e`, `--end`        | End time (in seconds)                                  |              |
+| `--skip-avatars`     | Skip downloading user avatars                          |              |
+| `--skip-emojis`      | Skip downloading emojis                                |              |
+| `--no-clip`          | Don\'t clip chat messages at the top                   |              |
+| `--cache`            | Cache downloaded avatars and emojis to disk            |              |
+| `--proxy`            | HTTP/HTTPS/SOCKS proxy (e.g. socks5://127.0.0.1:1080/) |              |
 
 
 ## Fonts
