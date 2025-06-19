@@ -4,10 +4,10 @@ Convert YouTube Live Chat JSON (.live_chat.json) from [yt-dlp](https://github.co
 
 <br/>
 <div align="center">
-   <img alt="screenshot_1" src="https://github.com/user-attachments/assets/35971241-e2df-470f-9813-b0ca8908457f" height="360">
+   <img alt="screenshot_1" src="https://github.com/user-attachments/assets/35971241-e2df-470f-9813-b0ca8908457f">
    <br/>
    <br/>
-   <img alt="screenshot_2" src="https://github.com/user-attachments/assets/fb61df91-08c5-478e-8f19-9113276293d3" height="360">
+   <img alt="screenshot_2" src="https://github.com/user-attachments/assets/b67d78f3-8863-4830-a003-46c58400d9c7">
 </div>
 <br/>
 
