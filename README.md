@@ -1,6 +1,6 @@
 # YouTube Chat to Video
 
-Convert YouTube Live Chat JSON (.live_chat.json) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into an `.mp4` video for overlaying chat messages on recorded streams.
+Convert YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into an `.mp4` video for overlaying chat messages on recorded streams.
 
 <br/>
 <div align="center">
