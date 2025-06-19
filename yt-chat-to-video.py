@@ -31,6 +31,7 @@ parser.add_argument('--skip-avatars', action='store_true', help='Skip downloadin
 parser.add_argument('--skip-emojis', action='store_true', help='Skip downloading YouTube emoji thumbnails')
 parser.add_argument('--no-clip', action='store_false', help='Don\'t clip chat messages at the top')
 parser.add_argument('--cache', action='store_true', help='Cache downloaded avatars and emojis to disk')
+parser.add_argument('--proxy', help='HTTP/HTTPS/SOCKS proxy (e.g. socks5://127.0.0.1:1080/)')
 #parser.add_argument('--youtube-api-key', help='(Optional) Specify YouTube API key to download missing user avatars')  # TODO: implement this feature
 args = parser.parse_args()
 
@@ -81,6 +82,11 @@ skip_emojis = args.skip_emojis
 # Cache
 cache_to_disk = args.cache
 cache_folder = "_cache"
+
+# Set proxy
+if args.proxy:
+    os.environ['HTTP_PROXY'] = args.proxy
+    os.environ['HTTPS_PROXY'] = args.proxy
 
 # Load chat font
 try:
