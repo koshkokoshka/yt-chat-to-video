@@ -47,10 +47,10 @@ Convert YouTube Live Chat JSON (.live_chat.json) from [yt-dlp](https://github.co
 | `-p`, `--padding`    | Inner padding in pixels                                | `24`         |
 | `-s`, `--start`      | Start time (in seconds)                                |              |
 | `-e`, `--end`        | End time (in seconds)                                  |              |
-| `--skip-avatars`     | Skip downloading user avatars                          |              |
-| `--skip-emojis`      | Skip downloading emojis                                |              |
-| `--no-clip`          | Don\'t clip chat messages at the top                   |              |
-| `--cache`            | Cache downloaded avatars and emojis to disk            |              |
+| `--skip-avatars`     | Skip downloading user avatars                          | false        |
+| `--skip-emojis`      | Skip downloading emojis                                | false        |
+| `--cache`            | Cache downloaded avatars and emojis to disk            | false        |
+| `--no-clip`          | Don\'t clip chat messages at the top                   | true         |
 | `--proxy`            | HTTP/HTTPS/SOCKS proxy (e.g. socks5://127.0.0.1:1080/) |              |
 
 
