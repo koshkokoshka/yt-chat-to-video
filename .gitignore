@@ -1,7 +1,7 @@
 .idea
 ffmpeg.exe
 *.mp4
-_cache
+yt-chat-to-video_cache/
 *.part
 *.ytdl
 *.json

@@ -22,6 +22,7 @@ parser.add_argument('input_json_file', help='Path to YouTube live chat JSON file
 parser.add_argument('-o', '--output', default="output.mp4", help="Output filename")
 parser.add_argument('-w', '--width', type=int, default=400, help="Output video width")
 parser.add_argument('-h', '--height', type=int, default=540, help="Output video height")
+parser.add_argument('--scale', dest='chat_scale', type=int, default=1, help="Chat resolution scale")
 parser.add_argument('-r', '--frame-rate', type=int, default=10, help="Output video framerate")
 parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
 parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
@@ -30,7 +31,7 @@ parser.add_argument('-e', '--end', '--to', dest='end_time', type=float, default=
 parser.add_argument('--skip-avatars', action='store_true', help='Skip downloading user avatars')
 parser.add_argument('--skip-emojis', action='store_true', help='Skip downloading YouTube emoji thumbnails')
 parser.add_argument('--no-clip', action='store_false', help='Don\'t clip chat messages at the top')
-parser.add_argument('--cache', action='store_true', help='Cache downloaded avatars and emojis to disk')
+parser.add_argument('--use-cache', action='store_true', help='Cache downloaded avatars and emojis to disk')
 parser.add_argument('--proxy', help='HTTP/HTTPS/SOCKS proxy (e.g. socks5://127.0.0.1:1080/)')
 #parser.add_argument('--youtube-api-key', help='(Optional) Specify YouTube API key to download missing user avatars')  # TODO: implement this feature
 args = parser.parse_args()
@@ -66,12 +67,14 @@ end_time_seconds = args.end_time
 chat_background = hex_to_rgb(args.background)
 chat_author_color = blend_colors(hex_to_rgb('#ffffff'), chat_background, 0.7)
 chat_message_color = hex_to_rgb('#ffffff')
-chat_padding = args.padding
-chat_avatar_size = 24
-chat_emoji_size = 16      # TODO: should be 24px (youtube size)
-chat_line_height = 16
-chat_avatar_padding = 16  # Space between avatar image and author name
-char_author_padding = 8   # Space between author name and message text
+chat_scale = args.chat_scale
+chat_font_size = 13 * chat_scale
+chat_padding = args.padding * chat_scale
+chat_avatar_size = 24 * chat_scale
+chat_emoji_size = 16 * chat_scale       # TODO: should be 24px (youtube size)
+chat_line_height = 16 * chat_scale
+chat_avatar_padding = 16 * chat_scale   # Space between avatar image and author name
+char_author_padding = 8 * chat_scale    # Space between author name and message text
 chat_inner_x = chat_padding
 chat_inner_width = width - (chat_padding * 2)
 
@@ -80,8 +83,8 @@ skip_avatars = args.skip_avatars
 skip_emojis = args.skip_emojis
 
 # Cache
-cache_to_disk = args.cache
-cache_folder = "_cache"
+cache_to_disk = args.use_cache
+cache_folder = "yt-chat-to-video_cache"
 
 # Set proxy
 if args.proxy:
@@ -91,8 +94,8 @@ if args.proxy:
 # Load chat font
 try:
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    chat_message_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Regular.ttf", 13)
-    chat_author_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Medium.ttf", 13)
+    chat_message_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Regular.ttf", chat_font_size)
+    chat_author_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Medium.ttf", chat_font_size)
 except:
     print("\n")
     print("Warning: Can't load chat font. Fallback to default (may look ugly and don't support unicode).")
@@ -192,7 +195,7 @@ if cache_to_disk:
         for filename in os.listdir(cache_folder):
             cache_key = GetCachedImageKey(filename)
             cache[cache_key] = Image.open(f"{cache_folder}/{filename}").convert("RGBA")
-        print(f"{len(cache)} images loaded")
+        print(f"{len(cache)} images loaded from cache")
 else:
     print("\n")
     print("Hint: You can enable caching by adding --cache argument,")
@@ -206,12 +209,15 @@ if not skip_avatars:
         cache_key = GetCachedImageKey(avatar_url)
         if cache_key not in cache:
             print(f"Downloading avatar: {avatar_url}")
-            response = requests.get(avatar_url)
-            avatar = Image.open(BytesIO(response.content)).convert("RGBA")
-            avatar = avatar.resize((chat_avatar_size, chat_avatar_size), Image.LANCZOS)  # Resize to desired output size
-            cache[cache_key] = avatar
-            if cache_to_disk:
-                avatar.save(f"{cache_folder}/{cache_key}.png")
+            try:
+                response = requests.get(avatar_url)
+                avatar = Image.open(BytesIO(response.content)).convert("RGBA")
+                avatar = avatar.resize((chat_avatar_size, chat_avatar_size), Image.LANCZOS)  # Resize to desired output size
+                cache[cache_key] = avatar
+                if cache_to_disk:
+                    avatar.save(f"{cache_folder}/{cache_key}.png")
+            except:
+                print(f"Error: Can't download avatar: {avatar_url}")
 
 def CreateAvatarMask(size, scale):
     hires_size = size * scale
@@ -232,12 +238,15 @@ if not skip_emojis:
                 cache_key = GetCachedImageKey(emoji_url)
                 if cache_key not in cache:
                     print(f"Downloading emoji: {emoji_url}")
-                    response = requests.get(emoji_url)
-                    emoji = Image.open(BytesIO(response.content)).convert("RGBA")
-                    emoji = emoji.resize((chat_emoji_size, chat_emoji_size), Image.LANCZOS)  # Resize to desired output size
-                    cache[cache_key] = emoji
-                    if cache_to_disk:
-                        emoji.save(f"{cache_folder}/{cache_key}.png")
+                    try:
+                        response = requests.get(emoji_url)
+                        emoji = Image.open(BytesIO(response.content)).convert("RGBA")
+                        emoji = emoji.resize((chat_emoji_size, chat_emoji_size), Image.LANCZOS)  # Resize to desired output size
+                        cache[cache_key] = emoji
+                        if cache_to_disk:
+                            emoji.save(f"{cache_folder}/{cache_key}.png")
+                    except:
+                        print(f"Error: Can't download emoji: {emoji_url}")
 
 # Chat drawing method
 current_message_index = -1
@@ -291,15 +300,15 @@ def DrawChat():
 
         # Calculate vertical offsets (youtube chat message has 4px padding from top and bottom)
         if num_lines == 1:
-            message_height = chat_avatar_size + 4 + 4
-            avatar_y = 4
-            author_y = 8
-            runs_y = 8
+            message_height = chat_avatar_size + ((4 + 4) * chat_scale)
+            avatar_y = 4 * chat_scale
+            author_y = 8 * chat_scale
+            runs_y = 8 * chat_scale
         else:
-            message_height = (num_lines * chat_line_height) + 4 + 4
-            avatar_y = 4  # add top padding to avatar on multiline lines
-            author_y = 4
-            runs_y = 4
+            message_height = (num_lines * chat_line_height) + ((4 + 4) * chat_scale)
+            avatar_y = 4 * chat_scale  # add top padding to avatar on multiline lines
+            author_y = 4 * chat_scale
+            runs_y = 4 * chat_scale
 
         y += message_height
         no_more_space = y > height
