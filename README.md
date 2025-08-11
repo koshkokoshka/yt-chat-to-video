@@ -1,6 +1,6 @@
 # YouTube Chat to Video
 
-This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a video format (`mp4` or `webm`), allowing you to render the chat messages as an overlay on a video. It supports downloading user avatars and emojis, and can generate videos with transparent backgrounds for easy overlaying on recorded streams.
+This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a video format (`.mp4` or `.webm`), allowing you to render the chat messages as an overlay on a video. It supports downloading user avatars and emojis, and can generate videos with transparent backgrounds for easy overlaying on recorded streams.
 
 <br/>
 <div align="center">
