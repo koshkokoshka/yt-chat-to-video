@@ -22,13 +22,13 @@ parser.add_argument('input_json_file', help='Path to YouTube live chat JSON file
 parser.add_argument('-o', '--output', help="Output filename")
 parser.add_argument('-w', '--width', type=int, default=400, help="Output video width")
 parser.add_argument('-h', '--height', type=int, default=540, help="Output video height")
-parser.add_argument('--scale', dest='chat_scale', type=int, default=1, help="Chat resolution scale")
+parser.add_argument('-s', '--scale', dest='chat_scale', type=int, default=1, help="Chat resolution scale")
 parser.add_argument('-r', '--frame-rate', type=int, default=10, help="Output video framerate")
 parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
 parser.add_argument('--transparent', action='store_true', help="Make chat background transparent (forces output to transparent .webm)")
 parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
-parser.add_argument('-s', '--start', '--from', dest='start_time', type=float, default=0, help='Start time in seconds')
-parser.add_argument('-e', '--end', '--to', dest='end_time', type=float, default=0, help='End time in seconds')
+parser.add_argument('-f', '--from', type=float, default=0, help='Start time in seconds')
+parser.add_argument('-t', '--to', type=float, default=0, help='End time in seconds')
 parser.add_argument('--skip-avatars', action='store_true', help='Skip downloading user avatars')
 parser.add_argument('--skip-emojis', action='store_true', help='Skip downloading YouTube emoji thumbnails')
 parser.add_argument('--no-clip', action='store_false', help='Don\'t clip chat messages at the top')
@@ -61,8 +61,8 @@ if fps < 1:
     exit(1)
 
 # Timing settings
-start_time_seconds = args.start_time
-end_time_seconds = args.end_time
+start_time_seconds = getattr(args, "from")
+end_time_seconds = getattr(args, "to")
 
 # Chat settings
 chat_background = hex_to_rgb(args.background)

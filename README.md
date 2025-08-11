@@ -66,13 +66,13 @@ python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080
 | `-o`, `--output`     | Output video file name                                                |           |
 | `-w`, `--width`      | Output video width (must be even)                                     | `400`     |
 | `-h`, `--height`     | Output video height (must be even)                                    | `540`     |
-| `--scale`            | Chat resolution scale                                                 | `1`       |
+| `-s`, `--scale`      | Chat resolution scale                                                 | `1`       |
 | `-r`, `--frame-rate` | Output video framerate                                                | `10`      |
 | `-b`, `--background` | Background color in hex                                               | `#0f0f0f` |
 | `--transparent`      | Make chat background transparent (forces output to transparent .webm) | `false`   |
 | `-p`, `--padding`    | Inner padding in pixels                                               | `24`      |
-| `-s`, `--start`      | Start time (in seconds)                                               |           |
-| `-e`, `--end`        | End time (in seconds)                                                 |           |
+| `--from`             | Start time (in seconds)                                               |           |
+| `--to`               | End time (in seconds)                                                 |           |
 | `--skip-avatars`     | Skip downloading user avatars                                         | `false`   |
 | `--skip-emojis`      | Skip downloading emojis                                               | `false`   |
 | `--use-cache`        | Cache downloaded avatars and emojis to disk                           | `false`   |
