@@ -1,6 +1,7 @@
 .idea
 ffmpeg.exe
 *.mp4
+*.webm
 yt-chat-to-video_cache/
 *.part
 *.ytdl

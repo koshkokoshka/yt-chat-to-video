@@ -19,12 +19,13 @@ def blend_colors(a_color, b_color, opacity):
 parser = argparse.ArgumentParser("yt-chat-to-video", add_help=False)
 parser.add_argument('--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 parser.add_argument('input_json_file', help='Path to YouTube live chat JSON file')
-parser.add_argument('-o', '--output', default="output.mp4", help="Output filename")
+parser.add_argument('-o', '--output', help="Output filename")
 parser.add_argument('-w', '--width', type=int, default=400, help="Output video width")
 parser.add_argument('-h', '--height', type=int, default=540, help="Output video height")
 parser.add_argument('--scale', dest='chat_scale', type=int, default=1, help="Chat resolution scale")
 parser.add_argument('-r', '--frame-rate', type=int, default=10, help="Output video framerate")
 parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
+parser.add_argument('--transparent', action='store_true', help="Make chat background transparent (forces output to transparent .webm)")
 parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
 parser.add_argument('-s', '--start', '--from', dest='start_time', type=float, default=0, help='Start time in seconds')
 parser.add_argument('-e', '--end', '--to', dest='end_time', type=float, default=0, help='End time in seconds')
@@ -78,6 +79,21 @@ char_author_padding = 8 * chat_scale    # Space between author name and message 
 chat_inner_x = chat_padding
 chat_inner_width = width - (chat_padding * 2)
 
+# If output filename is not specified, use input filename with .mp4 extension
+if not args.output:
+    if not args.input_json_file.endswith('.json'):
+        print("Error: Input file must be a JSON file")
+        exit(1)
+    dot = args.input_json_file.rfind('.')
+    args.output = args.input_json_file[:dot] + ".mp4"
+
+# If transparent background is requested, force output to .webm format
+if args.transparent:
+    if not args.output.endswith('.webm'):
+        print("Warning: Transparent background is requested, forcing output to .webm format")
+        dot = args.output.rfind('.')
+        args.output = args.output[:dot] + ".webm"
+
 # Flags
 skip_avatars = args.skip_avatars
 skip_emojis = args.skip_emojis
@@ -99,7 +115,7 @@ try:
 except:
     print("\n")
     print("Warning: Can't load chat font. Fallback to default (may look ugly and don't support unicode).")
-    print("         Make sure Roboto-Regular.ttf and Roboto-Medium.ttf files are in the /fonts directory")
+    print("         Make sure Roboto-Regular.ttf and Roboto-Medium.ttf are in the ./fonts directory")
     print("         You can download them from Google Fonts: https://fonts.google.com/specimen/Roboto")
     print("\n")
     chat_message_font = ImageFont.load_default()
@@ -155,13 +171,13 @@ try:
         'ffmpeg',
         '-y',                        # Overwrite output file
         '-f', 'rawvideo',            # Input format: raw video
-        '-pix_fmt', 'rgb24',         # Pixel format
+        '-pix_fmt', ('rgba' if args.transparent else 'rgb24'),         # Pixel format for raw input video
         '-s', f'{width}x{height}',   # Frame size
         '-r', str(fps),              # Frame rate
         '-i', '-',                   # Input from stdin
         '-an',                       # No audio
-        '-vcodec', 'libx264',        # Output codec
-        '-pix_fmt', 'yuv420p',       # Pixel format required for compatibility
+        '-vcodec', ('libvpx-vp9' if args.transparent else 'libx264'), # Output codec
+        '-pix_fmt', ('yuva420p' if args.transparent else 'yuv420p'), # Pixel format for output
         args.output                  # Output file
     ], stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
 except:
@@ -174,7 +190,10 @@ except:
     exit(1)
 
 # Create frame buffer with Pillow
-img = Image.new('RGB', (width, height))
+if args.transparent:
+    img = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+else:
+    img = Image.new('RGB', (width, height))
 draw = ImageDraw.Draw(img)
 
 # Cached images
@@ -198,11 +217,11 @@ if cache_to_disk:
         print(f"{len(cache)} images loaded from cache")
 else:
     print("\n")
-    print("Hint: You can enable caching by adding --cache argument,")
+    print("Hint: You can enable caching by adding --use-cache argument,")
     print("      this will avoid downloading images again on the next run")
     print("\n")
 
-# Pre-download avatar images
+# Pre-download user avatars
 if not skip_avatars:
     for message in messages:
         avatar_url = message[1]
@@ -248,11 +267,14 @@ if not skip_emojis:
                     except:
                         print(f"Error: Can't download emoji: {emoji_url}")
 
-# Chat drawing method
+# Chat rendering
 current_message_index = -1
 
 def DrawChat():
-    draw.rectangle([0, 0, width, height], fill=chat_background)
+    if args.transparent:
+        draw.rectangle([0, 0, width, height], fill=(0, 0, 0, 0))
+    else:
+        draw.rectangle([0, 0, width, height], fill=chat_background)
 
     y = 0
 
@@ -344,6 +366,17 @@ def DrawChat():
             if run_type == 1:  # emoji
                 img.paste(content, (run_x, y + runs_y + run_y), mask=content)
 
+def OnDrawChatError(e):
+    import traceback
+    traceback.print_exc()
+    print(f"\nError while drawing chat: {e}")
+    print("Exiting...")
+    if e and "images do not match" in str(e):
+        print("\n")
+        print("Note: This error occurs when the cached images (avatars or emojis) have a different size than expected — typically after changing the --scale parameter.")
+        print("      Simply delete the `yt-chat-to-video_cache` folder to force the script to re-download avatars and emojis at the correct size.")
+        print("\n")
+
 # Send frames to ffmpeg
 redraw = True
 num_frames = round(fps * duration_seconds)
@@ -355,7 +388,11 @@ for i in range(num_frames):
         redraw = True # redraw chat only on change
 
     if redraw:
-        DrawChat()
+        try:
+            DrawChat()
+        except Exception as e:
+            OnDrawChatError(e)
+            break
         redraw = False
 
     # Write raw RGB bytes to ffmpeg
