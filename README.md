@@ -1,6 +1,6 @@
 # YouTube Chat to Video
 
-Convert YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into an `.mp4` video for overlaying chat messages on recorded streams.
+This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a video format (`mp4` or `webm`), allowing you to render the chat messages as an overlay on a video. It supports downloading user avatars and emojis, and can generate videos with transparent backgrounds for easy overlaying on recorded streams.
 
 <br/>
 <div align="center">
@@ -22,18 +22,18 @@ Convert YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.
 
 ## Usage
 
-1. Download a YouTube video with live chat replay using [yt-dlp](https://github.com/yt-dlp/yt-dlp):
+1. Download the live chat replay using [yt-dlp](https://github.com/yt-dlp/yt-dlp):
     ```bash
     yt-dlp --skip-download --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=CqnNp8kwE78
     ```
 
-2. After the stream download completes, a `<video_id>.live_chat.json` file will appear in the directory.<br>
-   Pass this file to the script:
+2. After running the above command, you will have a file named `CqnNp8kwE78.live_chat.json` in the current directory. This file contains the live chat data.<br>
+   Pass this file to the script to convert it into a video:
     ```bash
     python yt-chat-to-video.py [options] <video_id>.live_chat.json -o output.mp4
     ```
 
-3. When conversion is complete, you'll get an `output.mp4` with rendered live chat
+3. Wait for the script to finish. It will generate a video file named `CqnNp8kwE78.mp4` in the current directory with the rendered chat messages.
 
 ## More common usage examples
 
