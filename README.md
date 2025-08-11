@@ -48,9 +48,11 @@ Convert YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.
     ```
 3. Use ffmpeg to overlay the chat video on top of recorded stream:
     ```bash
-    ffmpeg -i "CqnNp8kwE78.mp4" -c:v libvpx-vp9 -c:a copy -i "CqnNp8kwE78.live_chat.webp" -filter_complex "[1:v]scale=400:-1[chat];[0:v][chat]overlay=W-w-10:H-h-10" output.mp4
+    ffmpeg -i "CqnNp8kwE78.mp4" -c:v libvpx-vp9 -i "CqnNp8kwE78.live_chat.webp" -filter_complex "[1:v]scale=400:-1[chat];[0:v][chat]overlay=W-w-10:H-h-10" output.mp4
     ```
-Change `filter_complex` parameters to position the chat overlay as needed.
+   - (Note: without `-c:v libvpx-vp9` ffmpeg doesn't know how to handle transparent `.webp` files)
+
+   - Change `filter_complex` parameters to position the chat overlay as needed.
 
 ### Render chat at x2 scale in 1080p resolution (useful for downsampling)
 ```bash
