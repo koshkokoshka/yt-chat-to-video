@@ -556,6 +556,7 @@ class ChatRendererGUI(ctk.CTk):
         self.fps_entry = ctk.CTkEntry(t, width=80, height=35)
         self.fps_entry.insert(0, "60")
         self.fps_entry.grid(row=2, column=1, sticky="w", padx=10)
+        self.fps_entry.bind("<KeyRelease>", self.schedule_preview_update)
 
         # Codec Logic
         ctk.CTkLabel(t, text="Codec:").grid(row=3, column=0, padx=10, pady=10)

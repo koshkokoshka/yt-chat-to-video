@@ -553,7 +553,7 @@ if __name__ == "__main__":
     parser.add_argument('-w', '--width', type=int, default=400, help="Output video width")
     parser.add_argument('-h', '--height', type=int, default=540, help="Output video height")
     parser.add_argument('-s', '--scale', dest='chat_scale', type=float, default=1.0, help="Chat resolution scale")
-    parser.add_argument('-r', '--frame-rate', type=int, default=60, help="Output video framerate (default 60)")
+    parser.add_argument('-r', '--frame-rate', type=float, default=60, help="Output video framerate (default 60)")
     parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
     parser.add_argument('--transparent', action='store_true', help="Make chat background transparent")
     parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
@@ -716,6 +716,11 @@ if __name__ == "__main__":
     sys.stdout.flush()
     
     ffmpeg_cmd = get_ffmpeg_command(args)
+    # Ensure output directory exists
+    output_dir = os.path.dirname(os.path.abspath(args.output))
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
     try:
         # pylint: disable=consider-using-with
         ffmpeg = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE, text=False)
@@ -774,7 +779,7 @@ if __name__ == "__main__":
                 print(f"FFMPEG Error: {stderr_out.decode()}")
                 raise RuntimeError("FFMPEG exited early.") from exc
             
-            if i % args.frame_rate == 0:
+            if i % max(1, int(args.frame_rate)) == 0:
                 print(f"PROGRESS:{int(i/num_frames*100)}")
                 sys.stdout.flush()
         
