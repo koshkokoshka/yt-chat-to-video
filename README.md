@@ -61,23 +61,26 @@ python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080
 
 ## Command Line Arguments
 
-| Option               | Description                                                           | Default   |
-|----------------------|-----------------------------------------------------------------------|-----------|
-| `-o`, `--output`     | Output video file name                                                |           |
-| `-w`, `--width`      | Output video width (must be even)                                     | `400`     |
-| `-h`, `--height`     | Output video height (must be even)                                    | `540`     |
-| `-s`, `--scale`      | Chat resolution scale                                                 | `1`       |
-| `-r`, `--frame-rate` | Output video framerate                                                | `10`      |
-| `-b`, `--background` | Background color in hex                                               | `#0f0f0f` |
-| `--transparent`      | Make chat background transparent (forces output to transparent .webm) | `false`   |
-| `-p`, `--padding`    | Inner padding in pixels                                               | `24`      |
-| `--from`             | Start time (in seconds)                                               |           |
-| `--to`               | End time (in seconds)                                                 |           |
-| `--skip-avatars`     | Skip downloading user avatars                                         | `false`   |
-| `--skip-emojis`      | Skip downloading emojis                                               | `false`   |
-| `--use-cache`        | Cache downloaded avatars and emojis to disk                           | `false`   |
-| `--no-clip`          | Don\'t clip chat messages at the top                                  | `true`    |
-| `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)              |           |
+| Option               | Description                                                           | Default           |
+|----------------------|-----------------------------------------------------------------------|-------------------|
+| `-o`, `--output`     | Output video file name                                                |                   |
+| `-w`, `--width`      | Output video width (must be even)                                     | `400`             |
+| `-h`, `--height`     | Output video height (must be even)                                    | `540`             |
+| `-s`, `--scale`      | Chat resolution scale                                                 | `1`               |
+| `-r`, `--frame-rate` | Output video framerate                                                | `10`              |
+| `-b`, `--background` | Background color in hex                                               | `#0f0f0f`         |
+| `--transparent`      | Make chat background transparent (forces output to transparent .webm) | `false`           |
+| `--font-chat`        | Font for chat messages (must be installed on your system)             | `Roboto-Medium`   |
+| `--font-author`      | Font for author names (must be installed on your system)              | `Roboto-Regiular` |
+| `-p`, `--padding`    | Inner padding in pixels                                               | `24`              |
+| `-u`, `--uppercase`  | Uppercase all chat message text                                       | `false`           |
+| `--from`             | Start time (in seconds)                                               |                   |
+| `--to`               | End time (in seconds)                                                 |                   |
+| `--skip-avatars`     | Skip downloading user avatars                                         | `false`           |
+| `--skip-emojis`      | Skip downloading emojis                                               | `false`           |
+| `--cache`            | Cache downloaded avatars and emojis to disk                           | `false`           |
+| `--no-clip`          | Don\'t clip chat messages at the top                                  | `true`            |
+| `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)              |                   |
 
 
 ## Fonts

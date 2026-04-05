@@ -26,13 +26,16 @@ parser.add_argument('-s', '--scale', dest='chat_scale', type=int, default=1, hel
 parser.add_argument('-r', '--frame-rate', type=int, default=10, help="Output video framerate")
 parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
 parser.add_argument('--transparent', action='store_true', help="Make chat background transparent (forces output to transparent .webm)")
+parser.add_argument('--font-chat', default="Roboto-Regular", help="Font for chat messages (must be installed on your system)")
+parser.add_argument('--font-author', default="Roboto-Medium", help="Font for author names (must be installed on your system)")
 parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
+parser.add_argument('-u', '--uppercase', action='store_true', help="Uppercase all chat message text")
 parser.add_argument('-f', '--from', type=float, default=0, help='Start time in seconds')
 parser.add_argument('-t', '--to', type=float, default=0, help='End time in seconds')
 parser.add_argument('--skip-avatars', action='store_true', help='Skip downloading user avatars')
 parser.add_argument('--skip-emojis', action='store_true', help='Skip downloading YouTube emoji thumbnails')
 parser.add_argument('--no-clip', action='store_false', help='Don\'t clip chat messages at the top')
-parser.add_argument('--use-cache', action='store_true', help='Cache downloaded avatars and emojis to disk')
+parser.add_argument('--use-cache', '--cache', action='store_true', help='Cache downloaded avatars and emojis to disk')
 parser.add_argument('--proxy', help='HTTP/HTTPS/SOCKS proxy (e.g. socks5://127.0.0.1:1080/)')
 #parser.add_argument('--youtube-api-key', help='(Optional) Specify YouTube API key to download missing user avatars')  # TODO: implement this feature
 args = parser.parse_args()
@@ -67,15 +70,18 @@ end_time_seconds = getattr(args, "to")
 # Chat settings
 chat_background = hex_to_rgb(args.background)
 chat_author_color = blend_colors(hex_to_rgb('#ffffff'), chat_background, 0.7)
+chat_moderator_color = hex_to_rgb('#3ea6ff')
 chat_message_color = hex_to_rgb('#ffffff')
 chat_scale = args.chat_scale
 chat_font_size = 13 * chat_scale
 chat_padding = args.padding * chat_scale
 chat_avatar_size = 24 * chat_scale
+chat_badge_size = 16 * chat_scale
 chat_emoji_size = 16 * chat_scale       # TODO: should be 24px (youtube size)
 chat_line_height = 16 * chat_scale
 chat_avatar_padding = 16 * chat_scale   # Space between avatar image and author name
-char_author_padding = 8 * chat_scale    # Space between author name and message text
+chat_author_padding = 8 * chat_scale    # Space between author name and message text
+chat_badge_padding = 2 * chat_scale     # Space between author name and badge icon
 chat_inner_x = chat_padding
 chat_inner_width = width - (chat_padding * 2)
 
@@ -102,24 +108,45 @@ skip_emojis = args.skip_emojis
 cache_to_disk = args.use_cache
 cache_folder = "yt-chat-to-video_cache"
 
+if chat_scale != 1:
+    cache_folder += f"_x{chat_scale}"  # avoid cache mismatch error (fix suggested by @ExceptionFatale ❤️)
+
 # Set proxy
 if args.proxy:
     os.environ['HTTP_PROXY'] = args.proxy
     os.environ['HTTPS_PROXY'] = args.proxy
 
 # Load chat font
+def find_font(font_name):
+    font_paths = [
+        f"fonts/{font_name}.ttf",
+    ]
+    if os.name == 'nt':  # Windows
+        font_paths.extend([
+            f"C:/Windows/Fonts/{font_name}.ttf",
+        ])
+    elif os.name == 'posix':  # macOS or Linux
+        font_paths.extend([
+            f"~/.local/share/fonts/{font_name}.ttf",   # Linux
+            f"/usr/share/fonts/{font_name}.ttf",       # Linux
+            f"~/Library/Fonts/{font_name}.ttf",        # macOS
+            f"/Library/Fonts/{font_name}.ttf",         # macOS
+            f"/System/Library/Fonts/{font_name}.ttf",  # macOS
+        ])
+    for path in font_paths:
+        if os.path.exists(path):
+            return path
+    return None
+
 try:
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    chat_message_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Regular.ttf", chat_font_size)
-    chat_author_font = ImageFont.truetype(f"{script_dir}/fonts/Roboto-Medium.ttf", chat_font_size)
+    chat_author_font = ImageFont.truetype(find_font(args.font_author), chat_font_size)
+    chat_message_font = ImageFont.truetype(find_font(args.font_chat), chat_font_size)
 except:
-    print("\n")
+    print()
     print("Warning: Can't load chat font. Fallback to default (may look ugly and don't support unicode).")
-    print("         Make sure Roboto-Regular.ttf and Roboto-Medium.ttf are in the ./fonts directory")
-    print("         You can download them from Google Fonts: https://fonts.google.com/specimen/Roboto")
-    print("\n")
-    chat_message_font = ImageFont.load_default()
+    print()
     chat_author_font = ImageFont.load_default()
+    chat_message_font = ImageFont.load_default()
 
 # Load chat messages
 chat_messages = []
@@ -127,29 +154,60 @@ with open(args.input_json_file, "r", encoding='utf-8') as f:
     for line in f:
         chat_messages.append(json.loads(line))
 
+def get_chat_message_time_ms(chat_message):
+    if chat_message['isLive']:
+        return chat_message['videoOffsetTimeMsec']
+    else:
+        return chat_message['replayChatItemAction']['videoOffsetTimeMsec']
+
+def get_chat_message_avatar_url(renderer):
+    return renderer['authorPhoto']['thumbnails'][0]['url']
+
+def get_chat_message_author_name(renderer):
+    if not 'authorName' in renderer:
+        return ''
+    return renderer['authorName']['simpleText']
+
+def get_chat_message_badge_icon(renderer):
+    badges = renderer.get('authorBadges')
+    if not badges:
+        return None
+    first_badge = badges[0]
+    return first_badge['liveChatAuthorBadgeRenderer']['icon']['iconType']
+
+def get_chat_message_text(run):
+    text = run['text'].strip()
+    if args.uppercase:
+        text = text.upper()
+    return text
+
+def get_chat_message_emoji_url(run):
+    return run['emoji']['image']['thumbnails'][0]['url']
+
 messages = []  # processed messages
 for chat_message in chat_messages:
-    chat_item = chat_message['replayChatItemAction']
 
-    time_ms = chat_item['videoOffsetTimeMsec']
+    time_ms = get_chat_message_time_ms(chat_message)
     if end_time_seconds != 0 and int(time_ms) > end_time_seconds * 1000:
         break  # do not process messages that's not within current time window
 
+    chat_item = chat_message['replayChatItemAction']
     for action in chat_item['actions']:
         if 'addChatItemAction' in action:
             renderer = action['addChatItemAction']['item'].get('liveChatTextMessageRenderer')
             if not renderer:
                 continue
-            avatar_url = renderer['authorPhoto']['thumbnails'][0]['url']
-            author = renderer['authorName']['simpleText'] if 'authorName' in renderer else ''
+
+            avatar_url = get_chat_message_avatar_url(renderer)
+            author_name = get_chat_message_author_name(renderer)
+            badge_icon = get_chat_message_badge_icon(renderer)
             runs = []
             for run in renderer['message']['runs']:
                 if 'text' in run:
-                    runs.append((0, run['text'].strip()))
+                    runs.append((0, get_chat_message_text(run)))
                 elif 'emoji' in run:
-                    emoji_url = run['emoji']['image']['thumbnails'][0]['url']
-                    runs.append((1, emoji_url))
-            messages.append((int(time_ms), avatar_url, author, runs))
+                    runs.append((1, get_chat_message_emoji_url(run)))
+            messages.append((int(time_ms), avatar_url, author_name, badge_icon, runs))
 
 if len(messages) == 0:
     if end_time_seconds != 0:
@@ -176,8 +234,8 @@ try:
         '-r', str(fps),              # Frame rate
         '-i', '-',                   # Input from stdin
         '-an',                       # No audio
-        '-vcodec', ('libvpx-vp9' if args.transparent else 'libx264'), # Output codec
-        '-pix_fmt', ('yuva420p' if args.transparent else 'yuv420p'), # Pixel format for output
+        '-vcodec', ('libvpx-vp9' if args.transparent else 'libx264'),  # Output codec
+        '-pix_fmt', ('yuva420p' if args.transparent else 'yuv420p'),   # Pixel format for output
         args.output                  # Output file
     ], stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
 except:
@@ -199,7 +257,7 @@ draw = ImageDraw.Draw(img)
 # Cached images
 cache = {}
 
-def GetCachedImageKey(path):
+def get_cached_image_key(path):
     no_extension, _ = os.path.splitext(path)                # Remove file extension (.png)
     no_protocol = no_extension.split('://', 1)[-1]          # Remove protocol (https://)
     safe_key = re.sub(r'[^a-zA-Z0-9_-]', '_', no_protocol)  # Replace all unsafe characters with '_'
@@ -212,20 +270,20 @@ if cache_to_disk:
     else:
         print("Loading cached images from disk...")
         for filename in os.listdir(cache_folder):
-            cache_key = GetCachedImageKey(filename)
+            cache_key = get_cached_image_key(filename)
             cache[cache_key] = Image.open(f"{cache_folder}/{filename}").convert("RGBA")
         print(f"{len(cache)} images loaded from cache")
 else:
-    print("\n")
-    print("Hint: You can enable caching by adding --use-cache argument,")
+    print()
+    print("Hint: You can enable caching by adding --cache argument,")
     print("      this will avoid downloading images again on the next run")
-    print("\n")
+    print()
 
 # Pre-download user avatars
 if not skip_avatars:
     for message in messages:
         avatar_url = message[1]
-        cache_key = GetCachedImageKey(avatar_url)
+        cache_key = get_cached_image_key(avatar_url)
         if cache_key not in cache:
             print(f"Downloading avatar: {avatar_url}")
             try:
@@ -235,10 +293,13 @@ if not skip_avatars:
                 cache[cache_key] = avatar
                 if cache_to_disk:
                     avatar.save(f"{cache_folder}/{cache_key}.png")
+            except KeyboardInterrupt:
+                print("\nInterrupted by user")
+                exit(1)
             except:
                 print(f"Error: Can't download avatar: {avatar_url}")
 
-def CreateAvatarMask(size, scale):
+def create_avatar_mask(size, scale):
     hires_size = size * scale
     mask = Image.new("L", (hires_size, hires_size), 0)
     draw = ImageDraw.Draw(mask)
@@ -246,15 +307,15 @@ def CreateAvatarMask(size, scale):
     mask = mask.resize((size, size), Image.LANCZOS)
     return mask
 
-avatar_mask = CreateAvatarMask(chat_avatar_size, 4)
+avatar_mask = create_avatar_mask(chat_avatar_size, 4)
 
 # Pre-download emojis
 if not skip_emojis:
     for message in messages:
-        for run in message[3]:
+        for run in message[4]:
             if run[0] == 1:
                 emoji_url = run[1]
-                cache_key = GetCachedImageKey(emoji_url)
+                cache_key = get_cached_image_key(emoji_url)
                 if cache_key not in cache:
                     print(f"Downloading emoji: {emoji_url}")
                     try:
@@ -264,13 +325,26 @@ if not skip_emojis:
                         cache[cache_key] = emoji
                         if cache_to_disk:
                             emoji.save(f"{cache_folder}/{cache_key}.png")
+                    except KeyboardInterrupt:
+                        print("\nInterrupted by user")
+                        exit(1)
                     except:
                         print(f"Error: Can't download emoji: {emoji_url}")
+
+# Create badge icons (TODO: load form SVG files)
+badge_icons = {
+    'MODERATOR': Image.open("icons/badge-moderator-96.png").convert("RGBA").resize((chat_badge_size, chat_badge_size), Image.LANCZOS)
+}
+
+def get_badge_icon(badge_name):
+    if not badge_name:
+        return None
+    return badge_icons.get(badge_name)
 
 # Chat rendering
 current_message_index = -1
 
-def DrawChat():
+def draw_chat():
     if args.transparent:
         draw.rectangle([0, 0, width, height], fill=(0, 0, 0, 0))
     else:
@@ -282,17 +356,24 @@ def DrawChat():
     layout = []
     for i in range(current_message_index, -1, -1):  # from current message towards the first one (inclusive)
         message = messages[i]
+        has_badge = message[3] is not None
 
         # Calculate horizontal offsets
         avatar_x = chat_inner_x
         author_x = avatar_x + chat_avatar_size + chat_avatar_padding
-        runs_x = author_x + chat_author_font.getbbox(message[2])[2] + char_author_padding  # author_x + author_width + author_padding
+        author_width = chat_author_font.getbbox(message[2])[2]
+        badge_x = author_x + author_width
+        runs_x = badge_x
+        if has_badge:
+            badge_x = badge_x + chat_badge_padding
+            runs_x = badge_x + chat_badge_size
+        runs_x = runs_x + chat_author_padding
 
         # Process message runs
         num_lines = 1
         runs = []
         run_x, run_y = runs_x, 0
-        for run_type, content in message[3]:
+        for run_type, content in message[4]:
             if run_type == 0:  # text
                 for word in content.split(" "):
                     word_width = chat_message_font.getbbox(word + " ")[2]
@@ -307,7 +388,7 @@ def DrawChat():
                     run_x += word_width
 
             if run_type == 1:  # emoji
-               emoji = cache.get(GetCachedImageKey(content))
+               emoji = cache.get(get_cached_image_key(content))
                if emoji:
                    emoji_width = emoji.size[0]
 
@@ -339,25 +420,33 @@ def DrawChat():
             break  # no more space for messages
 
         # Store layout information
-        layout.append((message_height, message, avatar_x, avatar_y, author_x, author_y, runs_y, runs))
+        layout.append((message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs))
 
         if args.no_clip and no_more_space:
             break  # no more space for messages
 
     # Draw messages from bottom up
     y = height
-    for message_height, message, avatar_x, avatar_y, author_x, author_y, runs_y, runs in layout:
-        _, avatar_url, author, _ = message
+    for message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs in layout:
+        _, avatar_url, author_name, badge_name, _ = message
+        badge_icon = get_badge_icon(badge_name)
 
         y -= message_height
 
         # Draw avatar
-        avatar = cache.get(GetCachedImageKey(avatar_url))
+        avatar = cache.get(get_cached_image_key(avatar_url))
         if avatar:
             img.paste(avatar, (avatar_x, y + avatar_y), mask=avatar_mask)
 
-        # Draw author
-        draw.text((author_x, y + author_y), author, font=chat_author_font, fill=chat_author_color)
+        # Draw author name
+        author_color = chat_author_color
+        if badge_icon:
+            author_color = chat_moderator_color
+        draw.text((author_x, y + author_y), author_name, font=chat_author_font, fill=author_color)
+
+        # Draw badge icon
+        if badge_icon:
+            img.paste(badge_icon, (badge_x, y + author_y), mask=badge_icon)
 
         # Draw message
         for run_type, run_x, run_y, content in runs:
@@ -366,16 +455,11 @@ def DrawChat():
             if run_type == 1:  # emoji
                 img.paste(content, (run_x, y + runs_y + run_y), mask=content)
 
-def OnDrawChatError(e):
+def on_draw_chat_error(e):
     import traceback
     traceback.print_exc()
     print(f"\nError while drawing chat: {e}")
     print("Exiting...")
-    if e and "images do not match" in str(e):
-        print("\n")
-        print("Note: This error occurs when the cached images (avatars or emojis) have a different size than expected — typically after changing the --scale parameter.")
-        print("      Simply delete the `yt-chat-to-video_cache` folder to force the script to re-download avatars and emojis at the correct size.")
-        print("\n")
 
 # Send frames to ffmpeg
 redraw = True
@@ -389,9 +473,9 @@ for i in range(num_frames):
 
     if redraw:
         try:
-            DrawChat()
+            draw_chat()
         except Exception as e:
-            OnDrawChatError(e)
+            on_draw_chat_error(e)
             break
         redraw = False
 

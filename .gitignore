@@ -2,7 +2,7 @@
 ffmpeg.exe
 *.mp4
 *.webm
-yt-chat-to-video_cache/
+yt-chat-to-video_cache*
 *.part
 *.ytdl
 *.json
