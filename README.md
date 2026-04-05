@@ -1,6 +1,6 @@
 # YouTube Chat to Video
 
-This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a video format (`.mp4` or `.webm`), allowing you to render the chat messages as an overlay on a video. It supports downloading user avatars and emojis, and can generate videos with transparent backgrounds for easy overlaying on recorded streams.
+This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a video format (`.mp4` or `.webm`), allowing you to render the chat replay as an overlay for a video. It supports downloading user avatars and emojis, and can also generate videos with transparent backgrounds.
 
 <br/>
 <div align="center">
@@ -30,10 +30,10 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
 2. After running the above command, you will have a file named `CqnNp8kwE78.live_chat.json` in the current directory. This file contains the live chat data.<br>
    Pass this file to the script to convert it into a video:
     ```bash
-    python yt-chat-to-video.py [options] <video_id>.live_chat.json -o output.mp4
+    python yt-chat-to-video.py [options] CqnNp8kwE78.live_chat.json
     ```
 
-3. Wait for the script to finish. It will generate a video file named `CqnNp8kwE78.mp4` in the current directory with the rendered chat messages.
+3. Wait for the script to finish. It will generate a video file named `CqnNp8kwE78.mp4` in the current directory with the rendered chat replay.
 
 ## More common usage examples
 
@@ -54,7 +54,7 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
 
    - Change `filter_complex` parameters to position the chat overlay as needed.
 
-### Render chat at x2 scale in 1080p resolution (useful for downsampling)
+### Render chat at x2 scale (useful for downsampling)
 ```bash
 python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080
 ```
