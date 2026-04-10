@@ -1,6 +1,6 @@
 # YouTube Chat to Video
 
-This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a video format (`.mp4` or `.webm`), allowing you to render the chat replay as an overlay for a video. It supports downloading user avatars and emojis, and can also generate videos with transparent backgrounds.
+This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](https://github.com/yt-dlp/yt-dlp) into a video format (`.mp4` or `.webm`). It allows you to render a chat replay as an overlay for a video. This script supports downloading user avatars and emojis, and can also generate videos with transparent backgrounds.
 
 <br/>
 <div align="center">
@@ -27,7 +27,7 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
     yt-dlp --skip-download --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=CqnNp8kwE78
     ```
 
-2. After running the above command, you will have a file named `CqnNp8kwE78.live_chat.json` in the current directory. This file contains the live chat data.<br>
+2. After running the above command, a file named `CqnNp8kwE78.live_chat.json` will appear in the current directory. This file contains the live chat data.<br>
    Pass this file to the script to convert it into a video:
     ```bash
     python yt-chat-to-video.py [options] CqnNp8kwE78.live_chat.json
@@ -37,8 +37,8 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
 
 ## More common usage examples
 
-### Render chat with transparent background and overlay it on a video using ffmpeg
-1. Download YouTube video with live chat replay:
+### Render chat with a transparent background and overlay it on a video using ffmpeg
+1. Download the YouTube video with live chat replay:
     ```bash
     yt-dlp --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=CqnNp8kwE78
     ```
@@ -46,13 +46,13 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
     ```bash
     python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --transparent
     ```
-3. Use ffmpeg to overlay the chat video on top of recorded stream:
+3. Use ffmpeg to overlay the chat video on top of the recorded stream:
     ```bash
     ffmpeg -i "CqnNp8kwE78.mp4" -c:v libvpx-vp9 -i "CqnNp8kwE78.live_chat.webp" -filter_complex "[1:v]scale=400:-1[chat];[0:v][chat]overlay=W-w-10:H-h-10" output.mp4
     ```
    - (Note: without `-c:v libvpx-vp9` ffmpeg doesn't know how to handle transparent `.webp` files)
 
-   - Change `filter_complex` parameters to position the chat overlay as needed.
+   - Change the `filter_complex` parameters to position the chat overlay as needed.
 
 ### Render chat at x2 scale (useful for downsampling)
 ```bash
@@ -64,22 +64,22 @@ python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080
 | Option               | Description                                                           | Default           |
 |----------------------|-----------------------------------------------------------------------|-------------------|
 | `-o`, `--output`     | Output video file name                                                |                   |
+| `--from`             | Start time (in seconds)                                               |                   |
+| `--to`               | End time (in seconds)                                                 |                   |
 | `-w`, `--width`      | Output video width (must be even)                                     | `400`             |
 | `-h`, `--height`     | Output video height (must be even)                                    | `540`             |
 | `-s`, `--scale`      | Chat resolution scale                                                 | `1`               |
 | `-r`, `--frame-rate` | Output video framerate                                                | `10`              |
+| `--transparent`      | Make chat background transparent (forces output to transparent .webm) |                   |
 | `-b`, `--background` | Background color in hex                                               | `#0f0f0f`         |
-| `--transparent`      | Make chat background transparent (forces output to transparent .webm) | `false`           |
+| `-p`, `--padding`    | Inner padding in pixels                                               | `24`              |
 | `--font-chat`        | Font for chat messages (must be installed on your system)             | `Roboto-Medium`   |
 | `--font-author`      | Font for author names (must be installed on your system)              | `Roboto-Regiular` |
-| `-p`, `--padding`    | Inner padding in pixels                                               | `24`              |
-| `-u`, `--uppercase`  | Uppercase all chat message text                                       | `false`           |
-| `--from`             | Start time (in seconds)                                               |                   |
-| `--to`               | End time (in seconds)                                                 |                   |
-| `--skip-avatars`     | Skip downloading user avatars                                         | `false`           |
-| `--skip-emojis`      | Skip downloading emojis                                               | `false`           |
-| `--cache`            | Cache downloaded avatars and emojis to disk                           | `false`           |
-| `--no-clip`          | Don\'t clip chat messages at the top                                  | `true`            |
+| `-u`, `--uppercase`  | Uppercase all chat message text                                       |                   |
+| `--no-clip`          | Don\'t clip chat messages at the top                                  |                   |
+| `--skip-avatars`     | Skip downloading user avatars                                         |                   |
+| `--skip-emojis`      | Skip downloading emojis                                               |                   |
+| `--cache`            | Cache downloaded avatars and emojis to disk                           |                   |
 | `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)              |                   |
 
 
