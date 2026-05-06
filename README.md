@@ -85,9 +85,8 @@ python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080
 
 ## Fonts
 
-This project includes the [Roboto](https://fonts.google.com/specimen/Roboto) font, licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+This project includes the [Roboto](https://fonts.google.com/specimen/Roboto) font, licensed under the [SIL Open Font License, Version 1.1](https://openfontlicense.org/open-font-license-official-text/).
 
-- Roboto-Regular.ttf
-- Roboto-Medium.ttf
+Copyright 2011 The Roboto Project Authors
 
-Copyright (c) Google Fonts
+See `fonts/LICENSE-OFL.txt` for details.
