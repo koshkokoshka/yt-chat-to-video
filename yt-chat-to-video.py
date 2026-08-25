@@ -15,6 +15,18 @@ def hex_to_rgb(hex_color):
 def blend_colors(a_color, b_color, opacity):
     return tuple(int(a * opacity + b * (1 - opacity)) for a, b in zip(a_color, b_color))
 
+def safe_get(value, path, fallback=None):
+    try:
+        for part in path.split('.'):
+            if '[' in part:
+                key, index = part[:-1].split('[')  # Arrays
+                value = value[key][int(index)]
+            else:
+                value = value[part]  # Fields
+        return value
+    except:
+        return fallback
+
 # Parse arguments
 parser = argparse.ArgumentParser("yt-chat-to-video", add_help=False)
 parser.add_argument('--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
@@ -193,12 +205,10 @@ def get_chat_message_channel_id(renderer):
     return renderer['authorExternalChannelId']
 
 def get_chat_message_avatar_url(renderer):
-    return renderer['authorPhoto']['thumbnails'][0]['url']
+    return safe_get(renderer, 'authorPhoto.thumbnails[0].url')
 
 def get_chat_message_author_name(renderer):
-    if not 'authorName' in renderer:
-        return ''
-    return renderer['authorName']['simpleText']
+    return safe_get(renderer, 'authorName.simpleText', fallback='')
 
 def get_chat_message_badge_icon(renderer):
     badges = renderer.get('authorBadges')
@@ -207,7 +217,7 @@ def get_chat_message_badge_icon(renderer):
     first_badge = badges[0]
     badge_renderer = first_badge['liveChatAuthorBadgeRenderer']
     if 'icon' in badge_renderer:
-        return badge_renderer['icon']['iconType']
+        return safe_get(badge_renderer, 'icon.iconType')
     # TODO: add `badge_renderer['customThumbnail']` support
     return None
 
@@ -218,7 +228,7 @@ def get_chat_message_text(run):
     return text
 
 def get_chat_message_emoji_url(run):
-    return run['emoji']['image']['thumbnails'][0]['url']
+    return safe_get(run, 'emoji.image.thumbnails[0].url')
 
 MESSAGE_TIME = 0  # tuple indices
 MESSAGE_CHANNEL_ID = 1
@@ -269,6 +279,7 @@ duration_seconds = end_time_seconds - start_time_seconds
 
 # Launch ffmpeg subprocess
 try:
+    # TODO: add option to pass custom ffmpeg args
     ffmpeg = subprocess.Popen([
         'ffmpeg',
         '-y',                        # Overwrite output file
@@ -343,23 +354,24 @@ if not skip_avatars:
             # Fallback: Download missing avatar by channel ID using YouTube Data API
             if not avatar:
                 if args.youtube_api_key:
-                    print('Falling back to downloading with the YouTube Data API...')
+                    channel_id = message[MESSAGE_CHANNEL_ID]
+                    print(f'Falling back to downloading missing avatar for channel "{channel_id}" with the YouTube Data API...')
                     try:
-                        channel_id = message[MESSAGE_CHANNEL_ID]
-                        response = requests.get(f"https://www.googleapis.com/youtube/v3/channels?part=snippet&id={channel_id}&fields=items%2Fsnippet%2Fthumbnails&key={args.youtube_api_key}").json()
-                        avatar_url = response['items'][0]['snippet']['thumbnails']['default']['url']
+                        response = requests.get(f"https://www.googleapis.com/youtube/v3/channels?part=snippet&id={channel_id}&fields=items%2Fsnippet%2Fthumbnails&key={args.youtube_api_key}")
+                        avatar_url = safe_get(response.json(), 'items[0].snippet.thumbnails.default.url')
                         response = requests.get(avatar_url)
                         avatar = Image.open(BytesIO(response.content)).convert("RGBA")
                     except KeyboardInterrupt:
                         print("\nInterrupted by user")
                         exit(1)
+                    except:
+                        print(f"Error: Can't download user avatar")
+                        avatar = None
                 else:
                     print('Failed to download the user avatar. You can specify the --youtube-api-key parameter to download missing avatars.')
 
             # TODO: add option to generate fallback avatars (colored circle with a user's first initial)
-
-            if not avatar:
-                print(f"Error: Can't download avatar: {avatar_url}")
+            if avatar is None:
                 continue
 
             # Resize to desired output size

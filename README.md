@@ -62,31 +62,31 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
 
 ## Command Line Arguments
 
-| Option               | Description                                                                 | Default           |
-|----------------------|-----------------------------------------------------------------------------|-------------------|
-| `-o`, `--output`     | Output video file name                                                      |                   |
-| `-y`                 | Do not ask for output file overwrite confirmation                           |                   |
-| `--from`             | Start time (in seconds)                                                     |                   |
-| `--to`               | End time (in seconds)                                                       |                   |
-| `-w`, `--width`      | Output video width (must be even)                                           | `400`             |
-| `-h`, `--height`     | Output video height (must be even)                                          | `540`             |
-| `-s`, `--scale`      | Chat resolution scale                                                       | `1`               |
-| `-r`, `--frame-rate` | Output video framerate                                                      | `60`              |
-| `--animation-time`   | Duration of the chat message appearance animation in ms (0 to disable)      | `50`              |
-| `--transparent`      | Make the chat background transparent (forces output to a transparent .webm) |                   |
-| `-b`, `--background` | Background color in hex                                                     | `#0f0f0f`         |
-| `-p`, `--padding`    | Inner padding in pixels                                                     | `24`              |
-| `--font-chat`        | Font for chat messages (must be installed on your system)                   | `Roboto-Medium`   |
-| `--font-author`      | Font for author names (must be installed on your system)                    | `Roboto-Regiular` |
-| `-u`, `--uppercase`  | Uppercase all chat messages                                                 |                   |
-| `--stroke-width`     | Stroke width for chat messages                                              |                   |
-| `--stroke-color`     | Stroke color for chat messages in hex                                       |                   |
-| `--no-clip`          | Don\'t clip chat messages at the top                                        |                   |
-| `--skip-avatars`     | Skip downloading user avatars                                               |                   |
-| `--skip-emojis`      | Skip downloading emojis                                                     |                   |
-| `--cache`            | Cache downloaded avatars and emojis to disk                                 |                   |
-| `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)                    |                   |
-| `--youtube-api-key`  | YouTube Data API v3 key for downloading missing user avatars                |                   |
+| Option               | Description                                                                                              | Default           |
+|----------------------|----------------------------------------------------------------------------------------------------------|-------------------|
+| `-o`, `--output`     | Output video file name                                                                                   |                   |
+| `-y`                 | Do not ask for output file overwrite confirmation                                                        |                   |
+| `--from`             | Start time (in seconds)                                                                                  |                   |
+| `--to`               | End time (in seconds)                                                                                    |                   |
+| `-w`, `--width`      | Output video width (must be even)                                                                        | `400`             |
+| `-h`, `--height`     | Output video height (must be even)                                                                       | `540`             |
+| `-s`, `--scale`      | Chat resolution scale                                                                                    | `1`               |
+| `-r`, `--frame-rate` | Output video framerate                                                                                   | `60`              |
+| `--animation-time`   | Duration of the chat message appearance animation in ms (0 to disable)                                   | `50`              |
+| `--transparent`      | Make the chat background transparent (forces output to a transparent .webm)                              |                   |
+| `-b`, `--background` | Background color in hex                                                                                  | `#0f0f0f`         |
+| `-p`, `--padding`    | Inner padding in pixels                                                                                  | `24`              |
+| `--font-chat`        | Font for chat messages (must be installed on your system)                                                | `Roboto-Medium`   |
+| `--font-author`      | Font for author names (must be installed on your system)                                                 | `Roboto-Regiular` |
+| `-u`, `--uppercase`  | Uppercase all chat messages                                                                              |                   |
+| `--stroke-width`     | Stroke width for chat messages                                                                           |                   |
+| `--stroke-color`     | Stroke color for chat messages in hex                                                                    |                   |
+| `--no-clip`          | Don\'t clip chat messages at the top                                                                     |                   |
+| `--skip-avatars`     | Skip downloading user avatars                                                                            |                   |
+| `--skip-emojis`      | Skip downloading emojis                                                                                  |                   |
+| `--cache`            | Cache downloaded avatars and emojis to disk                                                              |                   |
+| `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)                                                 |                   |
+| `--youtube-api-key`  | [YouTube Data API v3](https://developers.google.com/youtube/v3) key for downloading missing user avatars |                   |
 
 
 ## Fonts
