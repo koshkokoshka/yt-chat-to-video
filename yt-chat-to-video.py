@@ -26,7 +26,8 @@ parser.add_argument('-t', '--to', type=float, default=0, help='End time in secon
 parser.add_argument('-w', '--width', type=int, default=400, help="Output video width")
 parser.add_argument('-h', '--height', type=int, default=540, help="Output video height")
 parser.add_argument('-s', '--scale', dest='chat_scale', type=int, default=1, help="Chat resolution scale")
-parser.add_argument('-r', '--frame-rate', type=int, default=10, help="Output video framerate")
+parser.add_argument('-r', '--frame-rate', type=int, default=60, help="Output video framerate")
+parser.add_argument('--animation-time', type=int, default=50, help="Duration of the chat message appearance animation in ms (0 to disable)")
 parser.add_argument('--transparent', action='store_true', help="Make chat background transparent (forces output to transparent .webm)")
 parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
 parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
@@ -71,6 +72,7 @@ start_time_seconds = getattr(args, "from")  # getattr is used because `from` is 
 end_time_seconds = getattr(args, "to")
 
 # Chat settings
+chat_animation_time = args.animation_time
 chat_background = hex_to_rgb(args.background)
 chat_author_color = blend_colors(hex_to_rgb('#ffffff'), chat_background, 0.7)
 chat_moderator_color = hex_to_rgb('#3ea6ff')
@@ -89,6 +91,20 @@ chat_author_padding = 8 * chat_scale    # Space between author name and message 
 chat_badge_padding = 2 * chat_scale     # Space between author name and badge icon
 chat_inner_x = chat_padding
 chat_inner_width = width - (chat_padding * 2)
+
+if chat_animation_time == 0 and fps > 10:
+    print()
+    print(f"Hint: Chat animation is disabled, but the FPS is set to a high value ({fps}).")
+    print( "      Consider lowering the FPS to 5–10 to reduce the rendering time.")
+    print( "      Use the -r <fps> option to adjust the frame rate.")
+    print()
+
+if chat_animation_time > 0 and fps * (chat_animation_time / 1000) < 3:
+    print("")
+    print(f"Note: The message appearance animation will have only ~{float(fps * (chat_animation_time / 1000.0)):.1f} frames and may look choppy.")
+    print( "      Consider increasing the FPS to make the animation smoother.")
+    print( "      Use the -r <fps> option to adjust the frame rate.")
+    print("")
 
 # If output filename is not specified, use input filename with .mp4 extension
 if not args.output:
@@ -391,6 +407,8 @@ badge_icons = {
 
 # Chat rendering
 current_message_index = -1
+current_message_time = 0
+current_animation_t = 0  # Animation factor (0.0 - start, 1.0 - end)
 
 def draw_chat():
     if args.transparent:
@@ -468,19 +486,22 @@ def draw_chat():
             break  # no more space for messages
 
         # Store layout information
-        layout.append((message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs))
+        layout.append((i, message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs))
 
         if args.no_clip and no_more_space:
             break  # no more space for messages
 
     # Draw messages from bottom up
     y = height
-    for message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs in layout:
+    for i, message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs in layout:
         avatar_url = message[MESSAGE_AVATAR_URL]
         author_name = message[MESSAGE_AUTHOR_NAME]
         badge_icon = badge_icons.get(message[MESSAGE_BADGE_ICON], None)
 
-        y -= message_height
+        if i == current_message_index:
+            y -= round(current_animation_t * message_height)  # Animate current message
+        else:
+            y -= message_height
 
         # Draw avatar
         avatar = cache.get(get_cached_image_key(avatar_url))
@@ -512,14 +533,34 @@ def on_draw_chat_error(e):
 
 # Send frames to ffmpeg
 redraw = True
+animation_active = False
 num_frames = round(fps * duration_seconds)
 for i in range(num_frames):
 
-    time_ms = (start_time_seconds + (i / fps)) * 1000
-    while current_message_index+1 < len(messages) and time_ms > messages[current_message_index+1][0]:
-        current_message_index += 1
-        redraw = True # redraw chat only on change
+    current_time_ms = (start_time_seconds + (i / fps)) * 1000
 
+    # Update current message
+    while current_message_index+1 < len(messages) and current_time_ms > messages[current_message_index+1][0]:
+        current_message_index += 1
+        current_message_time = messages[current_message_index][0]
+        animation_active = True
+
+    # Update animation
+    if animation_active:
+        redraw = True  # Redraw chat only when a new message appears or while animation is active
+        time_since_last_message = current_time_ms - current_message_time
+
+        if chat_animation_time > 0:
+            current_animation_t = time_since_last_message / chat_animation_time
+            current_animation_t = min(current_animation_t, 1.0)  # Clamp to [0.0, 1.0]
+            current_animation_t = current_animation_t * current_animation_t * (3.0 - 2.0 * current_animation_t)  # Smoothstep
+        else:
+            current_animation_t = 1.0
+
+        if time_since_last_message >= chat_animation_time:
+            animation_active = False  # Animation done
+
+    # Draw chat
     if redraw:
         try:
             draw_chat()

@@ -71,7 +71,8 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
 | `-w`, `--width`      | Output video width (must be even)                                           | `400`             |
 | `-h`, `--height`     | Output video height (must be even)                                          | `540`             |
 | `-s`, `--scale`      | Chat resolution scale                                                       | `1`               |
-| `-r`, `--frame-rate` | Output video framerate                                                      | `10`              |
+| `-r`, `--frame-rate` | Output video framerate                                                      | `60`              |
+| `--animation-time`   | Duration of the chat message appearance animation in ms (0 to disable)      | `50`              |
 | `--transparent`      | Make the chat background transparent (forces output to a transparent .webm) |                   |
 | `-b`, `--background` | Background color in hex                                                     | `#0f0f0f`         |
 | `-p`, `--padding`    | Inner padding in pixels                                                     | `24`              |
