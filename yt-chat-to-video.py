@@ -20,24 +20,27 @@ parser = argparse.ArgumentParser("yt-chat-to-video", add_help=False)
 parser.add_argument('--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 parser.add_argument('input_json_file', help='Path to YouTube live chat JSON file')
 parser.add_argument('-o', '--output', help="Output filename")
+parser.add_argument('-y', action='store_true', help="Do not ask for output file overwrite confirmation")
+parser.add_argument('-f', '--from', type=float, default=0, help='Start time in seconds')
+parser.add_argument('-t', '--to', type=float, default=0, help='End time in seconds')
 parser.add_argument('-w', '--width', type=int, default=400, help="Output video width")
 parser.add_argument('-h', '--height', type=int, default=540, help="Output video height")
 parser.add_argument('-s', '--scale', dest='chat_scale', type=int, default=1, help="Chat resolution scale")
 parser.add_argument('-r', '--frame-rate', type=int, default=10, help="Output video framerate")
-parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
 parser.add_argument('--transparent', action='store_true', help="Make chat background transparent (forces output to transparent .webm)")
+parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
+parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
 parser.add_argument('--font-chat', default="Roboto-Regular", help="Font for chat messages (must be installed on your system)")
 parser.add_argument('--font-author', default="Roboto-Medium", help="Font for author names (must be installed on your system)")
-parser.add_argument('-p', '--padding', type=int, default=24, help="Chat inner padding")
+parser.add_argument('--stroke-width', type=int, default=0, help="Stroke width for text")
+parser.add_argument('--stroke-color', default="#000000", help="Stroke color for text")
 parser.add_argument('-u', '--uppercase', action='store_true', help="Uppercase all chat message text")
-parser.add_argument('-f', '--from', type=float, default=0, help='Start time in seconds')
-parser.add_argument('-t', '--to', type=float, default=0, help='End time in seconds')
+parser.add_argument('--no-clip', action='store_false', help='Don\'t clip chat messages at the top')
 parser.add_argument('--skip-avatars', action='store_true', help='Skip downloading user avatars')
 parser.add_argument('--skip-emojis', action='store_true', help='Skip downloading YouTube emoji thumbnails')
-parser.add_argument('--no-clip', action='store_false', help='Don\'t clip chat messages at the top')
 parser.add_argument('--use-cache', '--cache', action='store_true', help='Cache downloaded avatars and emojis to disk')
 parser.add_argument('--proxy', help='HTTP/HTTPS/SOCKS proxy (e.g. socks5://127.0.0.1:1080/)')
-#parser.add_argument('--youtube-api-key', help='(Optional) Specify YouTube API key to download missing user avatars')  # TODO: implement this feature
+parser.add_argument('--youtube-api-key', help='YouTube Data API v3 key for downloading missing user avatars')
 args = parser.parse_args()
 
 # Video settings
@@ -64,7 +67,7 @@ if fps < 1:
     exit(1)
 
 # Timing settings
-start_time_seconds = getattr(args, "from")
+start_time_seconds = getattr(args, "from")  # getattr is used because `from` is a reserved keyword
 end_time_seconds = getattr(args, "to")
 
 # Chat settings
@@ -72,6 +75,8 @@ chat_background = hex_to_rgb(args.background)
 chat_author_color = blend_colors(hex_to_rgb('#ffffff'), chat_background, 0.7)
 chat_moderator_color = hex_to_rgb('#3ea6ff')
 chat_message_color = hex_to_rgb('#ffffff')
+chat_stroke_width = args.stroke_width
+chat_stroke_color = hex_to_rgb(args.stroke_color)
 chat_scale = args.chat_scale
 chat_font_size = 13 * chat_scale
 chat_padding = args.padding * chat_scale
@@ -99,6 +104,14 @@ if args.transparent:
         print("Warning: Transparent background is requested, forcing output to .webm format")
         dot = args.output.rfind('.')
         args.output = args.output[:dot] + ".webm"
+
+# Ask overwrite confirmation if file exists
+if not args.y:
+    if os.path.exists(args.output):
+        response = input(f"File '{args.output}' already exists. Overwrite? [y/N]: ").strip().lower()
+        if response not in ('y', 'yes'):
+            print("Canceled")
+            exit(1)
 
 # Flags
 skip_avatars = args.skip_avatars
@@ -160,6 +173,9 @@ def get_chat_message_time_ms(chat_message):
     else:
         return chat_message['replayChatItemAction']['videoOffsetTimeMsec']
 
+def get_chat_message_channel_id(renderer):
+    return renderer['authorExternalChannelId']
+
 def get_chat_message_avatar_url(renderer):
     return renderer['authorPhoto']['thumbnails'][0]['url']
 
@@ -173,7 +189,11 @@ def get_chat_message_badge_icon(renderer):
     if not badges:
         return None
     first_badge = badges[0]
-    return first_badge['liveChatAuthorBadgeRenderer']['icon']['iconType']
+    badge_renderer = first_badge['liveChatAuthorBadgeRenderer']
+    if 'icon' in badge_renderer:
+        return badge_renderer['icon']['iconType']
+    # TODO: add `badge_renderer['customThumbnail']` support
+    return None
 
 def get_chat_message_text(run):
     text = run['text'].strip()
@@ -183,6 +203,13 @@ def get_chat_message_text(run):
 
 def get_chat_message_emoji_url(run):
     return run['emoji']['image']['thumbnails'][0]['url']
+
+MESSAGE_TIME = 0  # tuple indices
+MESSAGE_CHANNEL_ID = 1
+MESSAGE_AVATAR_URL = 2
+MESSAGE_AUTHOR_NAME = 3
+MESSAGE_BADGE_ICON = 4
+MESSAGE_RUNS = 5
 
 messages = []  # processed messages
 for chat_message in chat_messages:
@@ -198,6 +225,7 @@ for chat_message in chat_messages:
             if not renderer:
                 continue
 
+            channel_id = get_chat_message_channel_id(renderer)
             avatar_url = get_chat_message_avatar_url(renderer)
             author_name = get_chat_message_author_name(renderer)
             badge_icon = get_chat_message_badge_icon(renderer)
@@ -207,7 +235,7 @@ for chat_message in chat_messages:
                     runs.append((0, get_chat_message_text(run)))
                 elif 'emoji' in run:
                     runs.append((1, get_chat_message_emoji_url(run)))
-            messages.append((int(time_ms), avatar_url, author_name, badge_icon, runs))
+            messages.append((int(time_ms), channel_id, avatar_url, author_name, badge_icon, runs))
 
 if len(messages) == 0:
     if end_time_seconds != 0:
@@ -263,11 +291,11 @@ def get_cached_image_key(path):
     safe_key = re.sub(r'[^a-zA-Z0-9_-]', '_', no_protocol)  # Replace all unsafe characters with '_'
     return safe_key
 
-# Load cached images from disk
 if cache_to_disk:
     if not os.path.exists(cache_folder):
         os.mkdir(cache_folder)
     else:
+        # Load cached images from disk
         print("Loading cached images from disk...")
         for filename in os.listdir(cache_folder):
             cache_key = get_cached_image_key(filename)
@@ -282,22 +310,47 @@ else:
 # Pre-download user avatars
 if not skip_avatars:
     for message in messages:
-        avatar_url = message[1]
+        avatar_url = message[MESSAGE_AVATAR_URL]
         cache_key = get_cached_image_key(avatar_url)
         if cache_key not in cache:
+            # Download user avatar
             print(f"Downloading avatar: {avatar_url}")
             try:
                 response = requests.get(avatar_url)
                 avatar = Image.open(BytesIO(response.content)).convert("RGBA")
-                avatar = avatar.resize((chat_avatar_size, chat_avatar_size), Image.LANCZOS)  # Resize to desired output size
-                cache[cache_key] = avatar
-                if cache_to_disk:
-                    avatar.save(f"{cache_folder}/{cache_key}.png")
             except KeyboardInterrupt:
                 print("\nInterrupted by user")
                 exit(1)
             except:
+                avatar = None
+
+            # Fallback: Download missing avatar by channel ID using YouTube Data API
+            if not avatar:
+                if args.youtube_api_key:
+                    print('Falling back to downloading with the YouTube Data API...')
+                    try:
+                        channel_id = message[MESSAGE_CHANNEL_ID]
+                        response = requests.get(f"https://www.googleapis.com/youtube/v3/channels?part=snippet&id={channel_id}&fields=items%2Fsnippet%2Fthumbnails&key={args.youtube_api_key}").json()
+                        avatar_url = response['items'][0]['snippet']['thumbnails']['default']['url']
+                        response = requests.get(avatar_url)
+                        avatar = Image.open(BytesIO(response.content)).convert("RGBA")
+                    except KeyboardInterrupt:
+                        print("\nInterrupted by user")
+                        exit(1)
+                else:
+                    print('Failed to download the user avatar. You can specify the --youtube-api-key parameter to download missing avatars.')
+
+            # TODO: add option to generate fallback avatars (colored circle with a user's first initial)
+
+            if not avatar:
                 print(f"Error: Can't download avatar: {avatar_url}")
+                continue
+
+            # Resize to desired output size
+            avatar = avatar.resize((chat_avatar_size, chat_avatar_size), Image.LANCZOS)
+            cache[cache_key] = avatar
+            if cache_to_disk:
+                avatar.save(f"{cache_folder}/{cache_key}.png")
 
 def create_avatar_mask(size, scale):
     hires_size = size * scale
@@ -307,12 +360,12 @@ def create_avatar_mask(size, scale):
     mask = mask.resize((size, size), Image.LANCZOS)
     return mask
 
-avatar_mask = create_avatar_mask(chat_avatar_size, 4)
+avatar_mask = create_avatar_mask(chat_avatar_size, 4)  # Draw at x4 scale, then downscale using Lanczos algorithm
 
 # Pre-download emojis
 if not skip_emojis:
     for message in messages:
-        for run in message[4]:
+        for run in message[MESSAGE_RUNS]:
             if run[0] == 1:
                 emoji_url = run[1]
                 cache_key = get_cached_image_key(emoji_url)
@@ -336,11 +389,6 @@ badge_icons = {
     'MODERATOR': Image.open("icons/badge-moderator-96.png").convert("RGBA").resize((chat_badge_size, chat_badge_size), Image.LANCZOS)
 }
 
-def get_badge_icon(badge_name):
-    if not badge_name:
-        return None
-    return badge_icons.get(badge_name)
-
 # Chat rendering
 current_message_index = -1
 
@@ -356,12 +404,12 @@ def draw_chat():
     layout = []
     for i in range(current_message_index, -1, -1):  # from current message towards the first one (inclusive)
         message = messages[i]
-        has_badge = message[3] is not None
+        has_badge = message[MESSAGE_BADGE_ICON] is not None
 
         # Calculate horizontal offsets
         avatar_x = chat_inner_x
         author_x = avatar_x + chat_avatar_size + chat_avatar_padding
-        author_width = chat_author_font.getbbox(message[2])[2]
+        author_width = chat_author_font.getbbox(message[MESSAGE_AUTHOR_NAME])[2]
         badge_x = author_x + author_width
         runs_x = badge_x
         if has_badge:
@@ -373,7 +421,7 @@ def draw_chat():
         num_lines = 1
         runs = []
         run_x, run_y = runs_x, 0
-        for run_type, content in message[4]:
+        for run_type, content in message[MESSAGE_RUNS]:
             if run_type == 0:  # text
                 for word in content.split(" "):
                     word_width = chat_message_font.getbbox(word + " ")[2]
@@ -428,8 +476,9 @@ def draw_chat():
     # Draw messages from bottom up
     y = height
     for message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs in layout:
-        _, avatar_url, author_name, badge_name, _ = message
-        badge_icon = get_badge_icon(badge_name)
+        avatar_url = message[MESSAGE_AVATAR_URL]
+        author_name = message[MESSAGE_AUTHOR_NAME]
+        badge_icon = badge_icons.get(message[MESSAGE_BADGE_ICON], None)
 
         y -= message_height
 
@@ -442,7 +491,7 @@ def draw_chat():
         author_color = chat_author_color
         if badge_icon:
             author_color = chat_moderator_color
-        draw.text((author_x, y + author_y), author_name, font=chat_author_font, fill=author_color)
+        draw.text((author_x, y + author_y), author_name, font=chat_author_font, fill=author_color, stroke_width=chat_stroke_width, stroke_fill=chat_stroke_color)
 
         # Draw badge icon
         if badge_icon:
@@ -451,7 +500,7 @@ def draw_chat():
         # Draw message
         for run_type, run_x, run_y, content in runs:
             if run_type == 0:  # text
-                draw.text((run_x, y + runs_y + run_y), content, font=chat_message_font, fill=chat_message_color)
+                draw.text((run_x, y + runs_y + run_y), content, font=chat_message_font, fill=chat_message_color, stroke_width=chat_stroke_width, stroke_fill=chat_stroke_color)
             if run_type == 1:  # emoji
                 img.paste(content, (run_x, y + runs_y + run_y), mask=content)
 

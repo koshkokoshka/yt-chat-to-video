@@ -48,45 +48,50 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
     ```
 3. Use ffmpeg to overlay the chat video on top of the recorded stream:
     ```bash
-    ffmpeg -i "CqnNp8kwE78.mp4" -c:v libvpx-vp9 -i "CqnNp8kwE78.live_chat.webp" -filter_complex "[1:v]scale=400:-1[chat];[0:v][chat]overlay=W-w-10:H-h-10" output.mp4
+    ffmpeg -i "CqnNp8kwE78.mp4" -c:v libvpx-vp9 -i "CqnNp8kwE78.live_chat.webm" -filter_complex "[1:v]scale=400:-1:flags=lanczos[chat];[0:v][chat]overlay=W-w-10:H-h-10" output.mp4
     ```
-   - (Note: without `-c:v libvpx-vp9` ffmpeg doesn't know how to handle transparent `.webp` files)
+   - `-c:v libvpx-vp9` codec to decode transparent `.webm` files
+   - `scale=400:-1` to set the chat size (width: 400px, height: auto)
+   - `flags=lanczos` for high-quality downsampling
+   - `overlay=W-w-10:H-h-10` to position the chat overlay in the bottom-right corner with 10px padding
 
-   - Change the `filter_complex` parameters to position the chat overlay as needed.
-
-### Render chat at x2 scale (useful for downsampling)
-```bash
-python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080
-```
+### Render chat at x2/x3/x4 scale (useful for downsampling)
+- **x2** `python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080`
+- **x3** `python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 3 -w 1200 -h 1620`
+- **x4** `python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 4 -w 1600 -h 2160`
 
 ## Command Line Arguments
 
-| Option               | Description                                                           | Default           |
-|----------------------|-----------------------------------------------------------------------|-------------------|
-| `-o`, `--output`     | Output video file name                                                |                   |
-| `--from`             | Start time (in seconds)                                               |                   |
-| `--to`               | End time (in seconds)                                                 |                   |
-| `-w`, `--width`      | Output video width (must be even)                                     | `400`             |
-| `-h`, `--height`     | Output video height (must be even)                                    | `540`             |
-| `-s`, `--scale`      | Chat resolution scale                                                 | `1`               |
-| `-r`, `--frame-rate` | Output video framerate                                                | `10`              |
-| `--transparent`      | Make chat background transparent (forces output to transparent .webm) |                   |
-| `-b`, `--background` | Background color in hex                                               | `#0f0f0f`         |
-| `-p`, `--padding`    | Inner padding in pixels                                               | `24`              |
-| `--font-chat`        | Font for chat messages (must be installed on your system)             | `Roboto-Medium`   |
-| `--font-author`      | Font for author names (must be installed on your system)              | `Roboto-Regiular` |
-| `-u`, `--uppercase`  | Uppercase all chat message text                                       |                   |
-| `--no-clip`          | Don\'t clip chat messages at the top                                  |                   |
-| `--skip-avatars`     | Skip downloading user avatars                                         |                   |
-| `--skip-emojis`      | Skip downloading emojis                                               |                   |
-| `--cache`            | Cache downloaded avatars and emojis to disk                           |                   |
-| `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)              |                   |
+| Option               | Description                                                                 | Default           |
+|----------------------|-----------------------------------------------------------------------------|-------------------|
+| `-o`, `--output`     | Output video file name                                                      |                   |
+| `-y`                 | Do not ask for output file overwrite confirmation                           |                   |
+| `--from`             | Start time (in seconds)                                                     |                   |
+| `--to`               | End time (in seconds)                                                       |                   |
+| `-w`, `--width`      | Output video width (must be even)                                           | `400`             |
+| `-h`, `--height`     | Output video height (must be even)                                          | `540`             |
+| `-s`, `--scale`      | Chat resolution scale                                                       | `1`               |
+| `-r`, `--frame-rate` | Output video framerate                                                      | `10`              |
+| `--transparent`      | Make the chat background transparent (forces output to a transparent .webm) |                   |
+| `-b`, `--background` | Background color in hex                                                     | `#0f0f0f`         |
+| `-p`, `--padding`    | Inner padding in pixels                                                     | `24`              |
+| `--font-chat`        | Font for chat messages (must be installed on your system)                   | `Roboto-Medium`   |
+| `--font-author`      | Font for author names (must be installed on your system)                    | `Roboto-Regiular` |
+| `-u`, `--uppercase`  | Uppercase all chat messages                                                 |                   |
+| `--stroke-width`     | Stroke width for chat messages                                              |                   |
+| `--stroke-color`     | Stroke color for chat messages in hex                                       |                   |
+| `--no-clip`          | Don\'t clip chat messages at the top                                        |                   |
+| `--skip-avatars`     | Skip downloading user avatars                                               |                   |
+| `--skip-emojis`      | Skip downloading emojis                                                     |                   |
+| `--cache`            | Cache downloaded avatars and emojis to disk                                 |                   |
+| `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)                    |                   |
+| `--youtube-api-key`  | YouTube Data API v3 key for downloading missing user avatars                |                   |
 
 
 ## Fonts
 
 This project includes the [Roboto](https://fonts.google.com/specimen/Roboto) font, licensed under the [SIL Open Font License, Version 1.1](https://openfontlicense.org/open-font-license-official-text/).
 
-Copyright 2011 The Roboto Project Authors
+Copyright (c) 2011, The Roboto Project Authors
 
 See `fonts/LICENSE-OFL.txt` for details.
