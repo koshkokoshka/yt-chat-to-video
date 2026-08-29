@@ -55,10 +55,11 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
    - `flags=lanczos` for high-quality downsampling
    - `overlay=W-w-10:H-h-10` to position the chat overlay in the bottom-right corner with 10px padding
 
-### Render chat at x2/x3/x4 scale (useful for downsampling)
-- **x2** `python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080`
-- **x3** `python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 3 -w 1200 -h 1620`
-- **x4** `python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 4 -w 1600 -h 2160`
+### Render chat at x2 scale (useful for downsampling)
+- `python yt-chat-to-video.py "CqnNp8kwE78.live_chat.json" --scale 2 -w 800 -h 1080`
+
+### Speedup transparent .webm encoding
+- Pass additional ffmpeg options `--ffmpeg-args "-deadline realtime -cpu-used 8 -row-mt 1"` to improve encoding speed
 
 ## Command Line Arguments
 
@@ -72,6 +73,7 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
 | `-h`, `--height`     | Output video height (must be even)                                                                       | `540`             |
 | `-s`, `--scale`      | Chat resolution scale                                                                                    | `1`               |
 | `-r`, `--frame-rate` | Output video framerate                                                                                   | `60`              |
+| `--ffmpeg-args`      | Pass additional arguments to FFmpeg                                                                      |                   |
 | `--animation-time`   | Duration of the chat message appearance animation in ms (0 to disable)                                   | `50`              |
 | `--transparent`      | Make the chat background transparent (forces output to a transparent .webm)                              |                   |
 | `-b`, `--background` | Background color in hex                                                                                  | `#0f0f0f`         |

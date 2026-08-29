@@ -5,7 +5,7 @@ import subprocess
 import requests
 import json
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, features
 
 # Helper functions
 def hex_to_rgb(hex_color):
@@ -39,6 +39,7 @@ parser.add_argument('-w', '--width', type=int, default=400, help="Output video w
 parser.add_argument('-h', '--height', type=int, default=540, help="Output video height")
 parser.add_argument('-s', '--scale', dest='chat_scale', type=int, default=1, help="Chat resolution scale")
 parser.add_argument('-r', '--frame-rate', type=int, default=60, help="Output video framerate")
+parser.add_argument('--ffmpeg-args', type=str, help="Pass additional arguments to FFmpeg")
 parser.add_argument('--animation-time', type=int, default=50, help="Duration of the chat message appearance animation in ms (0 to disable)")
 parser.add_argument('--transparent', action='store_true', help="Make chat background transparent (forces output to transparent .webm)")
 parser.add_argument('-b', '--background', default="#0f0f0f", help="Chat background color")
@@ -92,15 +93,17 @@ chat_message_color = hex_to_rgb('#ffffff')
 chat_stroke_width = args.stroke_width
 chat_stroke_color = hex_to_rgb(args.stroke_color)
 chat_scale = args.chat_scale
-chat_font_size = 13 * chat_scale
+chat_font_size = 14 * chat_scale
 chat_padding = args.padding * chat_scale
 chat_avatar_size = 24 * chat_scale
 chat_badge_size = 16 * chat_scale
-chat_emoji_size = 16 * chat_scale       # TODO: should be 24px (youtube size)
-chat_line_height = 16 * chat_scale
+chat_emoji_size = 24 * chat_scale
+chat_emoji_margin = 2 * chat_scale      # 2px margin around emojis
+chat_line_height = 20 * chat_scale
 chat_avatar_padding = 16 * chat_scale   # Space between avatar image and author name
 chat_author_padding = 8 * chat_scale    # Space between author name and message text
 chat_badge_padding = 2 * chat_scale     # Space between author name and badge icon
+chat_message_padding = 4 * chat_scale   # Space between messages
 chat_inner_x = chat_padding
 chat_inner_width = width - (chat_padding * 2)
 
@@ -179,6 +182,17 @@ def find_font(font_name):
             return path
     return None
 
+if features.check_feature("raqm") == False:
+    print("")
+    print("Warning: Raqm is not available. Text kerning may not be accurate.")
+    print("You can install libraqm to improve text rendering quality:")
+    print("  sudo apt install libraqm-dev")
+    print("or")
+    print("  if you're on Windows, download a prebuilt \"fribidi\" artifact from:")
+    print("  https://github.com/python-pillow/Pillow/actions/workflows/wheels.yml")
+    print("  and then place fribidi.dll next to the .py file")
+    print("")
+
 try:
     chat_author_font = ImageFont.truetype(find_font(args.font_author), chat_font_size)
     chat_message_font = ImageFont.truetype(find_font(args.font_chat), chat_font_size)
@@ -196,10 +210,13 @@ with open(args.input_json_file, "r", encoding='utf-8') as f:
         chat_messages.append(json.loads(line))
 
 def get_chat_message_time_ms(chat_message):
-    if chat_message['isLive']:
-        return chat_message['videoOffsetTimeMsec']
-    else:
-        return chat_message['replayChatItemAction']['videoOffsetTimeMsec']
+    time_ms =(
+           chat_message.get('videoOffsetTimeMsec')  # Chat downloaded during a live stream
+        or safe_get(chat_message, 'replayChatItemAction.videoOffsetTimeMsec')  # Chat downloaded from an ended stream
+    )
+    if time_ms:
+        return int(time_ms)
+    return None
 
 def get_chat_message_channel_id(renderer):
     return renderer['authorExternalChannelId']
@@ -241,27 +258,32 @@ messages = []  # processed messages
 for chat_message in chat_messages:
 
     time_ms = get_chat_message_time_ms(chat_message)
-    if end_time_seconds != 0 and int(time_ms) > end_time_seconds * 1000:
+    if not time_ms:
+        continue
+    if end_time_seconds != 0 and time_ms > end_time_seconds * 1000:
         break  # do not process messages that's not within current time window
 
-    chat_item = chat_message['replayChatItemAction']
-    for action in chat_item['actions']:
-        if 'addChatItemAction' in action:
-            renderer = action['addChatItemAction']['item'].get('liveChatTextMessageRenderer')
-            if not renderer:
-                continue
+    chat_item = chat_message.get('replayChatItemAction')
+    if not chat_item:
+        continue
 
-            channel_id = get_chat_message_channel_id(renderer)
-            avatar_url = get_chat_message_avatar_url(renderer)
-            author_name = get_chat_message_author_name(renderer)
-            badge_icon = get_chat_message_badge_icon(renderer)
-            runs = []
-            for run in renderer['message']['runs']:
-                if 'text' in run:
-                    runs.append((0, get_chat_message_text(run)))
-                elif 'emoji' in run:
-                    runs.append((1, get_chat_message_emoji_url(run)))
-            messages.append((int(time_ms), channel_id, avatar_url, author_name, badge_icon, runs))
+    actions = chat_item.get('actions', [])
+    for action in actions:
+        renderer = safe_get(action, 'addChatItemAction.item.liveChatTextMessageRenderer')
+        if not renderer:
+            continue  # Process only "addChatItemAction" actions with "liveChatTextMessageRenderer"
+
+        channel_id = get_chat_message_channel_id(renderer)
+        avatar_url = get_chat_message_avatar_url(renderer)
+        author_name = get_chat_message_author_name(renderer)
+        badge_icon = get_chat_message_badge_icon(renderer)
+        runs = []
+        for run in renderer['message']['runs']:
+            if 'text' in run:
+                runs.append((0, get_chat_message_text(run)))
+            elif 'emoji' in run:
+                runs.append((1, get_chat_message_emoji_url(run)))
+        messages.append((time_ms, channel_id, avatar_url, author_name, badge_icon, runs))
 
 if len(messages) == 0:
     if end_time_seconds != 0:
@@ -279,8 +301,7 @@ duration_seconds = end_time_seconds - start_time_seconds
 
 # Launch ffmpeg subprocess
 try:
-    # TODO: add option to pass custom ffmpeg args
-    ffmpeg = subprocess.Popen([
+    ffmpeg_args = [
         'ffmpeg',
         '-y',                        # Overwrite output file
         '-f', 'rawvideo',            # Input format: raw video
@@ -291,8 +312,14 @@ try:
         '-an',                       # No audio
         '-vcodec', ('libvpx-vp9' if args.transparent else 'libx264'),  # Output codec
         '-pix_fmt', ('yuva420p' if args.transparent else 'yuv420p'),   # Pixel format for output
-        args.output                  # Output file
-    ], stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    ]
+
+    if args.ffmpeg_args:
+        ffmpeg_args += args.ffmpeg_args.split(" ")  # Additional ffmpeg args
+
+    ffmpeg_args.append(args.output)  # Output file
+
+    ffmpeg = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
 except:
     print("Error: ffmpeg is not installed. Please install ffmpeg and try again.")
     print("You can install ffmpeg by running the following command:")
@@ -323,6 +350,7 @@ if cache_to_disk:
         os.mkdir(cache_folder)
     else:
         # Load cached images from disk
+        # TODO: Load images that appear only in the "--from" and "--to" range
         print("Loading cached images from disk...")
         for filename in os.listdir(cache_folder):
             cache_key = get_cached_image_key(filename)
@@ -423,73 +451,92 @@ current_message_time = 0
 current_animation_t = 0  # Animation factor (0.0 - start, 1.0 - end)
 
 def draw_chat():
+    # Clear all
     if args.transparent:
         draw.rectangle([0, 0, width, height], fill=(0, 0, 0, 0))
     else:
         draw.rectangle([0, 0, width, height], fill=chat_background)
 
+    #
+    # 1. Calculate messages layout
+    #
+    messages_layout = []
     y = 0
-
-    # Calculate layout to draw each visible message
-    layout = []
     for i in range(current_message_index, -1, -1):  # from current message towards the first one (inclusive)
         message = messages[i]
-        has_badge = message[MESSAGE_BADGE_ICON] is not None
 
-        # Calculate horizontal offsets
-        avatar_x = chat_inner_x
-        author_x = avatar_x + chat_avatar_size + chat_avatar_padding
+        # - Avatar
+        avatar_url = message[MESSAGE_AVATAR_URL]
+        avatar = cache.get(get_cached_image_key(avatar_url))
+        avatar_x = chat_padding
+        avatar_y = 0
+
+        # - Author
+        author = message[MESSAGE_AUTHOR_NAME]
+        author_x = chat_padding + chat_avatar_size + chat_avatar_padding
+        author_y = int(chat_avatar_size / 2)
         author_width = chat_author_font.getbbox(message[MESSAGE_AUTHOR_NAME])[2]
-        badge_x = author_x + author_width
-        runs_x = badge_x
-        if has_badge:
-            badge_x = badge_x + chat_badge_padding
-            runs_x = badge_x + chat_badge_size
-        runs_x = runs_x + chat_author_padding
 
-        # Process message runs
-        num_lines = 1
+        # - Badge
+        badge_url = message[MESSAGE_BADGE_ICON]
+        badge = badge_icons.get(badge_url, None)
+        badge_x = author_x + author_width + chat_badge_padding
+        badge_y = int(chat_avatar_size / 2) - int(chat_badge_size / 2)
+
+        author_color = chat_moderator_color if badge else chat_author_color
+
+        # - Runs
+        line_count = 1
         runs = []
-        run_x, run_y = runs_x, 0
-        for run_type, content in message[MESSAGE_RUNS]:
+        run_x = author_x + author_width + (chat_badge_size + chat_badge_padding if badge else 0) + chat_author_padding
+        run_y = int(chat_avatar_size / 2)
+        for run_type, run_content in message[MESSAGE_RUNS]:
             if run_type == 0:  # text
-                for word in content.split(" "):
-                    word_width = chat_message_font.getbbox(word + " ")[2]
+                for match in re.finditer(r'\S+\s*', run_content):  # Iterate over words (whitespace included)
+                    word = match.group()
+                    word_width = chat_message_font.getbbox(word)[2]
 
-                   # Wrap to new line
-                    if run_x + word_width > chat_inner_width:
-                        num_lines += 1
-                        run_x  = author_x
+                    # Handle line wrap
+                    if (run_x + word_width) > chat_inner_width:
+                        run_x = author_x
                         run_y += chat_line_height
+                        line_count += 1
 
                     runs.append((0, run_x, run_y, word))
+
                     run_x += word_width
 
-            if run_type == 1:  # emoji
-               emoji = cache.get(get_cached_image_key(content))
-               if emoji:
-                   emoji_width = emoji.size[0]
+            elif run_type == 1: # emoji
+                emoji = cache.get(get_cached_image_key(run_content))
+                if not emoji:
+                    continue
 
-                   # Wrap to new line
-                   if run_x + emoji_width > chat_inner_width:
-                       num_lines += 1
-                       run_x  = author_x
-                       run_y += chat_line_height
+                emoji_width, emoji_height = emoji.size
 
-                   runs.append((1, run_x, run_y, emoji))
-                   run_x += emoji_width
+                emoji_width += chat_emoji_margin  # Margin left
+                emoji_width += chat_emoji_margin  # Margin right
 
-        # Calculate vertical offsets (youtube chat message has 4px padding from top and bottom)
-        if num_lines == 1:
-            message_height = chat_avatar_size + ((4 + 4) * chat_scale)
-            avatar_y = 4 * chat_scale
-            author_y = 8 * chat_scale
-            runs_y = 8 * chat_scale
+                # Handle line wrap
+                if (run_x + emoji_width) > chat_inner_width:
+                    run_x = author_x
+                    run_y += chat_line_height
+                    line_count += 1
+
+                runs.append((1, run_x + chat_emoji_margin, run_y - int(chat_emoji_size / 2), emoji))
+
+                run_x += emoji_width
+
+        # Store layout information
+        # TODO: Spacing between lines with emojis doesn't match the reference
+        message_height = 0
+        message_height += chat_message_padding  # Top 4px padding
+        if line_count == 1:
+            message_height += chat_avatar_size  # First line is always the size of the avatar
+        elif line_count == 2:
+            message_height += chat_avatar_size + chat_font_size  # Last line is always equals to the font size
         else:
-            message_height = (num_lines * chat_line_height) + ((4 + 4) * chat_scale)
-            avatar_y = 4 * chat_scale  # add top padding to avatar on multiline lines
-            author_y = 4 * chat_scale
-            runs_y = 4 * chat_scale
+            message_height += chat_avatar_size + ((line_count-2) * chat_line_height) + chat_font_size
+        message_height += chat_message_padding  # Bottom 4px padding
 
         y += message_height
         no_more_space = y > height
@@ -497,45 +544,38 @@ def draw_chat():
         if not args.no_clip and no_more_space:
             break  # no more space for messages
 
-        # Store layout information
-        layout.append((i, message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs))
+        messages_layout.append((i, message_height, avatar, avatar_x, avatar_y, author, author_x, author_y, author_color, badge, badge_x, badge_y, runs))
 
         if args.no_clip and no_more_space:
             break  # no more space for messages
 
-    # Draw messages from bottom up
+    #
+    # 2. Draw calculated messages layout
+    #
     y = height
-    for i, message_height, message, avatar_x, avatar_y, author_x, author_y, badge_x, runs_y, runs in layout:
-        avatar_url = message[MESSAGE_AVATAR_URL]
-        author_name = message[MESSAGE_AUTHOR_NAME]
-        badge_icon = badge_icons.get(message[MESSAGE_BADGE_ICON], None)
-
+    for i, message_height, avatar, avatar_x, avatar_y, author, author_x, author_y, author_color, badge, badge_x, badge_y, runs in messages_layout:
         if i == current_message_index:
-            y -= round(current_animation_t * message_height)  # Animate current message
+            y -= round(current_animation_t * message_height)  # Animate message appearance
         else:
             y -= message_height
 
         # Draw avatar
-        avatar = cache.get(get_cached_image_key(avatar_url))
         if avatar:
-            img.paste(avatar, (avatar_x, y + avatar_y), mask=avatar_mask)
+            img.paste(avatar, (avatar_x, y+avatar_y), mask=avatar_mask)
 
-        # Draw author name
-        author_color = chat_author_color
-        if badge_icon:
-            author_color = chat_moderator_color
-        draw.text((author_x, y + author_y), author_name, font=chat_author_font, fill=author_color, stroke_width=chat_stroke_width, stroke_fill=chat_stroke_color)
+        # Draw author
+        draw.text((author_x, y+author_y), author, anchor="lm", font=chat_author_font, fill=author_color, stroke_width=chat_stroke_width, stroke_fill=chat_stroke_color)
 
-        # Draw badge icon
-        if badge_icon:
-            img.paste(badge_icon, (badge_x, y + author_y), mask=badge_icon)
+        # Draw badge
+        if badge:
+            img.paste(badge, (badge_x, y+badge_y), mask=badge)
 
-        # Draw message
-        for run_type, run_x, run_y, content in runs:
+        # Draw runs
+        for run_type, run_x, run_y, run_content, in runs:
             if run_type == 0:  # text
-                draw.text((run_x, y + runs_y + run_y), content, font=chat_message_font, fill=chat_message_color, stroke_width=chat_stroke_width, stroke_fill=chat_stroke_color)
+                draw.text((run_x, y+run_y), run_content, anchor="lm", font=chat_message_font, fill=chat_message_color, stroke_width=chat_stroke_width, stroke_fill=chat_stroke_color)
             if run_type == 1:  # emoji
-                img.paste(content, (run_x, y + runs_y + run_y), mask=content)
+                img.paste(run_content, (run_x, y+run_y), mask=run_content)
 
 def on_draw_chat_error(e):
     import traceback
