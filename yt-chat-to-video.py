@@ -15,6 +15,18 @@ def hex_to_rgb(hex_color):
 def blend_colors(a_color, b_color, opacity):
     return tuple(int(a * opacity + b * (1 - opacity)) for a, b in zip(a_color, b_color))
 
+def format_time(value: int) -> str:
+    if value < 0:
+        return "-" + format_time(abs(value))
+    if value < 60:
+        return f"00:00:{value:02d}"
+    if value < 3600:
+        minutes, seconds = divmod(value, 60)
+        return f"{minutes:02d}:{seconds:02d}"
+    hours, remainder = divmod(value, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
 def safe_get(value, path, fallback=None):
     try:
         for part in path.split('.'):
@@ -32,7 +44,7 @@ parser = argparse.ArgumentParser("yt-chat-to-video", add_help=False)
 parser.add_argument('--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 parser.add_argument('input_json_file', help='Path to YouTube live chat JSON file')
 parser.add_argument('-o', '--output', help="Output filename")
-parser.add_argument('-y', action='store_true', help="Do not ask for output file overwrite confirmation")
+parser.add_argument('-y', action='store_true', help="Skip confirmations")
 parser.add_argument('-f', '--from', type=float, default=0, help='Start time in seconds')
 parser.add_argument('-t', '--to', type=float, default=0, help='End time in seconds')
 parser.add_argument('-w', '--width', type=int, default=400, help="Output video width")
@@ -52,10 +64,24 @@ parser.add_argument('-u', '--uppercase', action='store_true', help="Uppercase al
 parser.add_argument('--no-clip', action='store_false', help='Don\'t clip chat messages at the top')
 parser.add_argument('--skip-avatars', action='store_true', help='Skip downloading user avatars')
 parser.add_argument('--skip-emojis', action='store_true', help='Skip downloading YouTube emoji thumbnails')
+parser.add_argument('--use-libcairo', action='store_true', help='Convert SVG icons using libcairo2')
 parser.add_argument('--use-cache', '--cache', action='store_true', help='Cache downloaded avatars and emojis to disk')
 parser.add_argument('--proxy', help='HTTP/HTTPS/SOCKS proxy (e.g. socks5://127.0.0.1:1080/)')
 parser.add_argument('--youtube-api-key', help='YouTube Data API v3 key for downloading missing user avatars')
 args = parser.parse_args()
+
+# Import cairosvg
+if args.use_libcairo:
+    try:
+        import cairosvg
+    except Exception as e:
+        print(e)
+        print('')
+        print("See https://www.cairographics.org/download/ for instructions on how to install Cairo on your system")
+        if os.name == 'nt':  # Windows
+            print("(if you're on Windows and have GIMP installed, just add the \"GIMP 3/bin\" directory to your PATH)")
+        print('')
+        exit(1)
 
 # Video settings
 width, height = args.width, args.height
@@ -135,14 +161,6 @@ if args.transparent:
         print("Warning: Transparent background is requested, forcing output to .webm format")
         dot = args.output.rfind('.')
         args.output = args.output[:dot] + ".webm"
-
-# Ask overwrite confirmation if file exists
-if not args.y:
-    if os.path.exists(args.output):
-        response = input(f"File '{args.output}' already exists. Overwrite? [y/N]: ").strip().lower()
-        if response not in ('y', 'yes'):
-            print("Canceled")
-            exit(1)
 
 # Flags
 skip_avatars = args.skip_avatars
@@ -299,6 +317,52 @@ if end_time_seconds == 0:
 
 duration_seconds = end_time_seconds - start_time_seconds
 
+# Ask confirmation before continue
+if not args.y:
+    print("")
+    print("Please review the settings before proceeding:")
+    print("(use --help to change them, -y to skip this confirmation)")
+    print("")
+    print(f"  Input file:               {args.input_json_file}")
+    print(f"  Output file:              {args.output}")
+    print(f"  Time range:               {format_time(int(start_time_seconds))} - {format_time(int(end_time_seconds))}")
+    print(f"  Video resolution:         {args.width}x{args.height}")
+    print(f"  Frame rate:               {args.frame_rate}")
+    print(f"  Chat scale:               x{args.chat_scale}")
+    if args.animation_time > 0:
+        print(f"  Animation:                {args.animation_time} ms ({float(fps * (chat_animation_time / 1000.0)):.1f} frames)")
+    else:
+        print(f"  Animation:                No")
+    print(f"  Background:               {'Transparent' if args.transparent else args.background}")
+    print(f"  Chat font:                {args.font_chat}")
+    print(f"  Author font:              {args.font_author}")
+    if args.stroke_width > 0:
+        print(f"  Text stroke:                   {args.stroke_width}px {args.stroke_color}")
+    else:
+        print(f"  Text stroke:              No")
+    print(f"  Uppercase messages:       {'Yes' if args.uppercase else 'No'}")
+    print(f"  Clip messages:            {'Yes' if args.no_clip else 'No'}")
+    print(f"  Cache downloaded images:  {'Yes' if args.use_cache else 'No [!]'}")
+    print(f"  Download avatars:         {'No' if args.skip_avatars else 'Yes'}")
+    print(f"  Download emojis:          {'No' if args.skip_emojis else 'Yes'}")
+    print(f"  SVG support:              {'Enabled' if args.use_libcairo else 'Disabled'}")
+    print(f"  Fetch missing avatars:    {'Yes' if args.youtube_api_key else 'No'}")
+    print(f"  Additional FFmpeg args:   {args.ffmpeg_args or 'None'}")
+    print("")
+    response = input("Continue? [Y/n]: ").strip().lower()
+    if response not in ('', 'y', 'yes'):
+        print("Canceled")
+        exit(0)
+
+# Ask overwrite confirmation if file exists
+if not args.y:
+    if os.path.exists(args.output):
+        print("")
+        response = input(f"File '{args.output}' already exists. Overwrite? [y/N]: ").strip().lower()
+        if response not in ('y', 'yes'):
+            print("Canceled")
+            exit(0)
+
 # Launch ffmpeg subprocess
 try:
     ffmpeg_args = [
@@ -396,7 +460,7 @@ if not skip_avatars:
                         print(f"Error: Can't download user avatar")
                         avatar = None
                 else:
-                    print('Failed to download the user avatar. You can specify the --youtube-api-key parameter to download missing avatars.')
+                    print('Failed to download the user avatar. Use --youtube-api-key to fetch missing avatars via the YouTube Data API.')
 
             # TODO: add option to generate fallback avatars (colored circle with a user's first initial)
             if avatar is None:
@@ -429,7 +493,16 @@ if not skip_emojis:
                     print(f"Downloading emoji: {emoji_url}")
                     try:
                         response = requests.get(emoji_url)
-                        emoji = Image.open(BytesIO(response.content)).convert("RGBA")
+                        if emoji_url.endswith('.svg'):
+                            if args.use_libcairo:
+                                # Convert .svg to .png using "cairosvg"
+                                image_data = cairosvg.svg2png(bytestring=response.content, output_height=chat_emoji_size)
+                            else:
+                                print("Skipping .svg file (use --enable-svg to convert SVG files using libcairo2)")
+                                continue
+                        else:
+                            image_data = response.content
+                        emoji = Image.open(BytesIO(image_data)).convert("RGBA")
                         emoji = emoji.resize((chat_emoji_size, chat_emoji_size), Image.LANCZOS)  # Resize to desired output size
                         cache[cache_key] = emoji
                         if cache_to_disk:
