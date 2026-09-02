@@ -35,18 +35,28 @@ Then run the script with the `--use-libcairo` option
 
 ## Basic usage
 
-### 1. Download the live chat replay
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/koshkokoshka/yt-chat-to-video.git
+```
+
+### 2. Download the live chat replay
+
 Use [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download the live chat replay:
 ```bash
 yt-dlp --skip-download --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=<video_id>
 ```
+
 This will create `<video_id>.live_chat.json` in the current directory, containing the live chat data.
 
-### 2. Render the chat
+### 3. Render the chat
+
 Pass the downloaded file to the script:
 ```bash
 python yt-chat-to-video.py [options] <video_id>.live_chat.json
 ```
+
 The script will generate `<video_id>.mp4` containing the rendered chat replay.
 
 ## Real-world usage example
@@ -86,9 +96,13 @@ python yt-chat-to-video.py \
 ### 3. Overlay the chat onto the video:
 
 Use FFmpeg to overlay the rendered chat onto the recorded stream:
-
 ```bash
-ffmpeg -i "<video_id>.mp4" -c:v libvpx-vp9 -i "<video_id>.live_chat.webm" -filter_complex "[1:v]scale=-1:480:flags=lanczos[chat];[0:v][chat]overlay=0:H-h-16" output.mp4
+ffmpeg \
+    -i "<video_id>.mp4" \
+    -c:v libvpx-vp9 \
+    -i "<video_id>.live_chat.webm" \
+    -filter_complex "[1:v]scale=-1:480:flags=lanczos[chat];[0:v][chat]overlay=0:H-h-16" \
+    "output.mp4"
 ```
 
 - `-c:v libvpx-vp9` - use the VP9 codec for the transparent `.webm` file
@@ -126,7 +140,7 @@ ffmpeg -i "<video_id>.mp4" -c:v libvpx-vp9 -i "<video_id>.live_chat.webm" -filte
 | `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)                                                 |                   |
 | `--youtube-api-key`  | [YouTube Data API v3](https://developers.google.com/youtube/v3) key for downloading missing user avatars |                   |
 
-## Fonts
+## License
 
 This project includes the [Roboto](https://fonts.google.com/specimen/Roboto) font, licensed under the [SIL Open Font License, Version 1.1](https://openfontlicense.org/open-font-license-official-text/).
 
