@@ -33,46 +33,68 @@ This script converts YouTube Live Chat JSON (`.live_chat.json`) from [yt-dlp](ht
 
 Then run the script with the `--use-libcairo` option
 
-## Usage
+## Basic usage
 
-1. Download the live chat replay using [yt-dlp](https://github.com/yt-dlp/yt-dlp):
-    ```bash
-    yt-dlp --skip-download --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=<video_id>
-    ```
+### 1. Download the live chat replay
+Use [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download the live chat replay:
+```bash
+yt-dlp --skip-download --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=<video_id>
+```
+This will create `<video_id>.live_chat.json` in the current directory, containing the live chat data.
 
-2. After running the above command, a file named `<video_id>>.live_chat.json` will appear in the current directory. This file contains the live chat data.<br>
-   Pass this file to the script to convert it into a video:
-    ```bash
-    python yt-chat-to-video.py [options] <video_id>.live_chat.json
-    ```
+### 2. Render the chat
+Pass the downloaded file to the script:
+```bash
+python yt-chat-to-video.py [options] <video_id>.live_chat.json
+```
+The script will generate `<video_id>.mp4` containing the rendered chat replay.
 
-3. Wait for the script to finish. It will generate a video file named `<video_id>.mp4` in the current directory with the rendered chat replay.
+## Real-world usage example
 
-## More common usage examples
+This example shows how to render the chat at x2 scale with a transparent background and overlay it onto the recorded stream using FFmpeg.
 
-### Render chat with a transparent background and overlay it on a video using ffmpeg
-1. Download the YouTube video with live chat replay:
-    ```bash
-    yt-dlp --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=<video_id>
-    ```
-2. Run the script to generate a transparent chat video:
-    ```bash
-    python yt-chat-to-video.py "<video_id>.live_chat.json" --transparent
-    ```
-3. Use ffmpeg to overlay the chat video on top of the recorded stream:
-    ```bash
-    ffmpeg -i "<video_id>.mp4" -c:v libvpx-vp9 -i "<video_id>.live_chat.webm" -filter_complex "[1:v]scale=-1:360:flags=lanczos[chat];[0:v][chat]overlay=W-w-10:H-h-10" output.mp4
-    ```
-   - `-c:v libvpx-vp9` codec to decode transparent `.webm` files
-   - `scale=-1:360` to set the chat size (width: auto, height: 360)
-   - `flags=lanczos` for high-quality downsampling
-   - `overlay=W-w-10:H-h-10` to position the chat overlay in the bottom-right corner with 10px padding
+### 1. Download the video and live chat replay
 
-### Speedup transparent .webm encoding
-- Pass additional ffmpeg options `--ffmpeg-args "-deadline realtime -cpu-used 8 -row-mt 1"` to improve encoding speed
+**Video**:
+```bash
+yt-dlp --live-from-start https://www.youtube.com/watch?v=<video_id>
+```
 
-### Render chat at x2 scale (useful for downsampling)
-- `python yt-chat-to-video.py "<video_id>.live_chat.json" --scale 2 -w 800 -h 1080`
+**Chat**:
+```
+yt-dlp --skip-download --write-subs --sub-lang "live_chat" https://www.youtube.com/watch?v=<video_id>
+```
+
+### 2. Render the chat
+
+```bash
+python yt-chat-to-video.py \
+    --transparent \
+    --stroke-width 2 \
+    --scale 2 \
+    --width 720 \
+    --height 720 \
+    --cache \
+    --ffmpeg-args "-deadline realtime -cpu-used 8 -row-mt 1" \
+    -y \
+    "<video_id>.live_chat.json"
+```
+
+- The chat will be rendered at x2 scale, so the video resolution is increased to 720x720 (it will be downscaled to 480p in the next step)
+- The additional `--ffmpeg-args` options are used to improve encoding speed
+
+### 3. Overlay the chat onto the video:
+
+Use FFmpeg to overlay the rendered chat onto the recorded stream:
+
+```bash
+ffmpeg -i "<video_id>.mp4" -c:v libvpx-vp9 -i "<video_id>.live_chat.webm" -filter_complex "[1:v]scale=-1:480:flags=lanczos[chat];[0:v][chat]overlay=0:H-h-16" output.mp4
+```
+
+- `-c:v libvpx-vp9` - use the VP9 codec for the transparent `.webm` file
+- `scale=-1:480` - set the chat size (width: auto, height: 480px)
+- `flags=lanczos` - use high-quality downsampling algorithm
+- `overlay=0:H-h-16` - position the chat overlay in the bottom-left corner with 16px padding from the bottom
 
 ## Command Line Arguments
 
@@ -103,7 +125,6 @@ Then run the script with the `--use-libcairo` option
 | `--cache`            | Cache downloaded avatars and emojis to disk                                                              |                   |
 | `--proxy`            | HTTP/HTTPS/SOCKS proxy (`e.g. socks5://127.0.0.1:1080/`)                                                 |                   |
 | `--youtube-api-key`  | [YouTube Data API v3](https://developers.google.com/youtube/v3) key for downloading missing user avatars |                   |
-
 
 ## Fonts
 
