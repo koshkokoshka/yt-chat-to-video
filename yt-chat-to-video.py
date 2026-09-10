@@ -7,6 +7,8 @@ import json
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont, features
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Helper functions
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
@@ -168,7 +170,7 @@ skip_emojis = args.skip_emojis
 
 # Cache
 cache_to_disk = args.use_cache
-cache_folder = "yt-chat-to-video_cache"
+cache_folder = f"{script_dir}/yt-chat-to-video_cache"
 
 if chat_scale != 1:
     cache_folder += f"_x{chat_scale}"  # avoid cache mismatch error (fix suggested by @ExceptionFatale ❤️)
@@ -181,7 +183,7 @@ if args.proxy:
 # Load chat font
 def find_font(font_name):
     font_paths = [
-        f"fonts/{font_name}.ttf",
+        f"{script_dir}/fonts/{font_name}.ttf",
     ]
     if os.name == 'nt':  # Windows
         font_paths.extend([
@@ -428,49 +430,56 @@ else:
 
 # Pre-download user avatars
 if not skip_avatars:
+
+    # Collect missing avatars
+    missing_avatars = set()
     for message in messages:
         avatar_url = message[MESSAGE_AVATAR_URL]
         cache_key = get_cached_image_key(avatar_url)
         if cache_key not in cache:
-            # Download user avatar
-            print(f"Downloading avatar: {avatar_url}")
-            try:
-                response = requests.get(avatar_url)
-                avatar = Image.open(BytesIO(response.content)).convert("RGBA")
-            except KeyboardInterrupt:
-                print("\nInterrupted by user")
-                exit(1)
-            except:
-                avatar = None
+            channel_id = message[MESSAGE_CHANNEL_ID]
+            missing_avatars.add((channel_id, avatar_url))
 
-            # Fallback: Download missing avatar by channel ID using YouTube Data API
-            if not avatar:
-                if args.youtube_api_key:
-                    channel_id = message[MESSAGE_CHANNEL_ID]
-                    print(f'Falling back to downloading missing avatar for channel "{channel_id}" with the YouTube Data API...')
-                    try:
-                        response = requests.get(f"https://www.googleapis.com/youtube/v3/channels?part=snippet&id={channel_id}&fields=items%2Fsnippet%2Fthumbnails&key={args.youtube_api_key}")
-                        avatar_url = safe_get(response.json(), 'items[0].snippet.thumbnails.default.url')
-                        response = requests.get(avatar_url)
-                        avatar = Image.open(BytesIO(response.content)).convert("RGBA")
-                    except KeyboardInterrupt:
-                        print("\nInterrupted by user")
-                        exit(1)
-                    except:
-                        print(f"Error: Can't download user avatar")
-                        avatar = None
-                else:
-                    print('Failed to download the user avatar. Use --youtube-api-key to fetch missing avatars via the YouTube Data API.')
+    # Download user avatars
+    for i, (channel_id, avatar_url) in enumerate(missing_avatars):
+        print(f"[{i+1}/{len(missing_avatars)}] Downloading avatar: {avatar_url}")
+        try:
+            response = requests.get(avatar_url)
+            avatar = Image.open(BytesIO(response.content)).convert("RGBA")
+        except KeyboardInterrupt:
+            print("\nInterrupted by user")
+            exit(1)
+        except:
+            avatar = None
 
-            # TODO: add option to generate fallback avatars (colored circle with a user's first initial)
-            if avatar is None:
-                continue
+        # Fallback: Download missing avatar by channel ID using YouTube Data API
+        if not avatar:
+            if args.youtube_api_key:
+                print(f'Falling back to downloading missing avatar for channel "{channel_id}" with the YouTube Data API...')
+                try:
+                    response = requests.get(f"https://www.googleapis.com/youtube/v3/channels?part=snippet&id={channel_id}&fields=items%2Fsnippet%2Fthumbnails&key={args.youtube_api_key}")
+                    avatar_url = safe_get(response.json(), 'items[0].snippet.thumbnails.default.url')
+                    response = requests.get(avatar_url)
+                    avatar = Image.open(BytesIO(response.content)).convert("RGBA")
+                except KeyboardInterrupt:
+                    print("\nInterrupted by user")
+                    exit(1)
+                except:
+                    print(f"Error: Can't download user avatar")
+                    avatar = None
+            else:
+                print('Failed to download the user avatar. Use --youtube-api-key to fetch missing avatars via the YouTube Data API.')
 
-            # Resize to desired output size
-            avatar = avatar.resize((chat_avatar_size, chat_avatar_size), Image.LANCZOS)
-            cache[cache_key] = avatar
-            if cache_to_disk:
-                avatar.save(f"{cache_folder}/{cache_key}.png")
+        # TODO: add option to generate fallback avatars (colored circle with a user's first initial)
+        if avatar is None:
+            continue
+
+        # Resize to desired output size
+        avatar = avatar.resize((chat_avatar_size, chat_avatar_size), Image.LANCZOS)
+        cache_key = get_cached_image_key(avatar_url)
+        cache[cache_key] = avatar
+        if cache_to_disk:
+            avatar.save(f"{cache_folder}/{cache_key}.png")
 
 def create_avatar_mask(size, scale):
     hires_size = size * scale
@@ -484,38 +493,46 @@ avatar_mask = create_avatar_mask(chat_avatar_size, 4)  # Draw at x4 scale, then 
 
 # Pre-download emojis
 if not skip_emojis:
+
+    # Collect missing emojis
+    missing_emojis = set()
     for message in messages:
         for run in message[MESSAGE_RUNS]:
             if run[0] == 1:
                 emoji_url = run[1]
                 cache_key = get_cached_image_key(emoji_url)
                 if cache_key not in cache:
-                    print(f"Downloading emoji: {emoji_url}")
-                    try:
-                        response = requests.get(emoji_url)
-                        if emoji_url.endswith('.svg'):
-                            if args.use_libcairo:
-                                # Convert .svg to .png using "cairosvg"
-                                image_data = cairosvg.svg2png(bytestring=response.content, output_height=chat_emoji_size)
-                            else:
-                                print("Skipping .svg file (use --enable-svg to convert SVG files using libcairo2)")
-                                continue
-                        else:
-                            image_data = response.content
-                        emoji = Image.open(BytesIO(image_data)).convert("RGBA")
-                        emoji = emoji.resize((chat_emoji_size, chat_emoji_size), Image.LANCZOS)  # Resize to desired output size
-                        cache[cache_key] = emoji
-                        if cache_to_disk:
-                            emoji.save(f"{cache_folder}/{cache_key}.png")
-                    except KeyboardInterrupt:
-                        print("\nInterrupted by user")
-                        exit(1)
-                    except:
-                        print(f"Error: Can't download emoji: {emoji_url}")
+                    missing_emojis.add(emoji_url)
+
+    # Download emojis
+    for i, emoji_url in enumerate(missing_emojis):
+        print(f"[{i+1}/{len(missing_emojis)}] Downloading emoji: {emoji_url}")
+        try:
+            response = requests.get(emoji_url)
+            if emoji_url.endswith('.svg'):
+                if args.use_libcairo:
+                    # Convert .svg to .png using "cairosvg"
+                    image_data = cairosvg.svg2png(bytestring=response.content, output_height=chat_emoji_size)
+                else:
+                    print("Skipping .svg file (use --enable-svg to convert SVG files using libcairo2)")
+                    continue
+            else:
+                image_data = response.content
+            emoji = Image.open(BytesIO(image_data)).convert("RGBA")
+            emoji = emoji.resize((chat_emoji_size, chat_emoji_size), Image.LANCZOS)  # Resize to desired output size
+            cache_key = get_cached_image_key(emoji_url)
+            cache[cache_key] = emoji
+            if cache_to_disk:
+                emoji.save(f"{cache_folder}/{cache_key}.png")
+        except KeyboardInterrupt:
+            print("\nInterrupted by user")
+            exit(1)
+        except:
+            print(f"Error: Can't download emoji: {emoji_url}")
 
 # Create badge icons (TODO: load form SVG files)
 badge_icons = {
-    'MODERATOR': Image.open("icons/badge-moderator-96.png").convert("RGBA").resize((chat_badge_size, chat_badge_size), Image.LANCZOS)
+    'MODERATOR': Image.open(f"{script_dir}/icons/badge-moderator-96.png").convert("RGBA").resize((chat_badge_size, chat_badge_size), Image.LANCZOS)
 }
 
 # Chat rendering
