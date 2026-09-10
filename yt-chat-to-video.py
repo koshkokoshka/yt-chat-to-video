@@ -33,10 +33,10 @@ def safe_get(value, path, fallback=None):
     try:
         for part in path.split('.'):
             if '[' in part:
-                key, index = part[:-1].split('[')  # Arrays
+                key, index = part[:-1].split('[')  # Array elements
                 value = value[key][int(index)]
             else:
-                value = value[part]  # Fields
+                value = value[part]  # Object fields
         return value
     except:
         return fallback
@@ -93,7 +93,7 @@ if width < 2:
     print("Error: Width must be greater than 2")
     exit(1)
 if width % 2 != 0:
-    print("Error: Width must be even number")
+    print("Error: Width must be an even number")
     exit(1)
 if width < 100:
     print("Error: Width can't be less than 100px")
@@ -102,14 +102,14 @@ if height < 32:
     print("Error: Height can't be less than 32px")
     exit(1)
 if height % 2 != 0:
-    print("Error: Height must be even number")
+    print("Error: Height must be an even number")
     exit(1)
 if fps < 1:
     print("Error: FPS can't be less than 1")
     exit(1)
 
 # Timing settings
-start_time_seconds = getattr(args, "from")  # getattr is used because `from` is a reserved keyword
+start_time_seconds = getattr(args, "from")  # use getattr because `from` is a reserved keyword
 end_time_seconds = getattr(args, "to")
 
 # Chat settings
@@ -160,7 +160,7 @@ if not args.output:
 # If transparent background is requested, force output to .webm format
 if args.transparent:
     if not args.output.endswith('.webm'):
-        print("Warning: Transparent background is requested, forcing output to .webm format")
+        print("Warning: Transparent background requested; forcing output to .webm format")
         dot = args.output.rfind('.')
         args.output = args.output[:dot] + ".webm"
 
@@ -218,7 +218,7 @@ try:
     chat_message_font = ImageFont.truetype(find_font(args.font_chat), chat_font_size)
 except:
     print()
-    print("Warning: Can't load chat font. Fallback to default (may look ugly and don't support unicode).")
+    print("Warning: Can't load chat font. Falling back to default (may look ugly and may not support Unicode).")
     print()
     chat_author_font = ImageFont.load_default()
     chat_message_font = ImageFont.load_default()
@@ -255,7 +255,7 @@ def get_chat_message_badge_icon(renderer):
     badge_renderer = first_badge['liveChatAuthorBadgeRenderer']
     if 'icon' in badge_renderer:
         return safe_get(badge_renderer, 'icon.iconType')
-    # TODO: add `badge_renderer['customThumbnail']` support
+    # TODO: add support for `badge_renderer['customThumbnail']`
     return None
 
 def get_chat_message_text(run):
@@ -281,7 +281,7 @@ for chat_message in chat_messages:
     if not time_ms:
         continue
     if end_time_seconds != 0 and time_ms > end_time_seconds * 1000:
-        break  # do not process messages that's not within current time window
+        break  # do not process messages outside the current time window
 
     chat_item = chat_message.get('replayChatItemAction')
     if not chat_item:
@@ -312,18 +312,18 @@ if len(messages) == 0:
         print("Error: No messages found in the chat file")
     exit(1)
 
-# Calculate actual duration of the video
+# Calculate the actual duration of the video
 max_duration_seconds = messages[-1][0] / 1000   # max duration = last message time
 if end_time_seconds == 0:
-    end_time_seconds = max_duration_seconds     # make sure end time is correct
+    end_time_seconds = max_duration_seconds
 
 duration_seconds = end_time_seconds - start_time_seconds
 
-# Ask confirmation before continue
+# Ask for confirmation before continuing
 if not args.y:
     print("")
     print("Please review the settings before proceeding:")
-    print("(use --help to change them, -y to skip this confirmation)")
+    print("(use --help to change them, or -y to skip this confirmation)")
     print("")
     print(f"  Input file:               {args.input_json_file}")
     print(f"  Output file:              {args.output}")
@@ -356,7 +356,7 @@ if not args.y:
         print("Canceled")
         exit(0)
 
-# Ask overwrite confirmation if file exists
+# Ask for overwrite confirmation if file exists
 if not args.y:
     if os.path.exists(args.output):
         print("")
@@ -387,12 +387,12 @@ try:
 
     ffmpeg = subprocess.Popen(ffmpeg_args, stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
 except:
-    print("Error: ffmpeg is not installed. Please install ffmpeg and try again.")
-    print("You can install ffmpeg by running the following command:")
+    print("Error: FFmpeg is not installed. Please install FFmpeg and try again.")
+    print("You can install FFmpeg by running the following command:")
     print("  sudo apt install ffmpeg")
     print("or")
     print("  if you're on Windows, visit https://github.com/BtbN/FFmpeg-Builds/releases/")
-    print("  to download prebuilt ffmpeg binary, then place ffmpeg.exe next to the .py file")
+    print("  to download a prebuilt FFmpeg binary, then place ffmpeg.exe next to the .py file")
     exit(1)
 
 # Create frame buffer with Pillow
@@ -416,7 +416,7 @@ if cache_to_disk:
         os.mkdir(cache_folder)
     else:
         # Load cached images from disk
-        # TODO: Load images that appear only in the "--from" and "--to" range
+        # TODO: Load only images that appear within the "--from" and "--to" range
         print("Loading cached images from disk...")
         for filename in os.listdir(cache_folder):
             cache_key = get_cached_image_key(filename)
@@ -424,8 +424,8 @@ if cache_to_disk:
         print(f"{len(cache)} images loaded from cache")
 else:
     print()
-    print("Hint: You can enable caching by adding --cache argument,")
-    print("      this will avoid downloading images again on the next run")
+    print("Hint: You can enable caching by adding the --cache argument.")
+    print("      This will avoid downloading images again on the next run.")
     print()
 
 # Pre-download user avatars
@@ -452,7 +452,7 @@ if not skip_avatars:
         except:
             avatar = None
 
-        # Fallback: Download missing avatar by channel ID using YouTube Data API
+        # Fallback: Download missing avatar by channel ID using the YouTube Data API
         if not avatar:
             if args.youtube_api_key:
                 print(f'Falling back to downloading missing avatar for channel "{channel_id}" with the YouTube Data API...')
@@ -465,7 +465,7 @@ if not skip_avatars:
                     print("\nInterrupted by user")
                     exit(1)
                 except:
-                    print(f"Error: Can't download user avatar")
+                    print("Error: Can't download user avatar")
                     avatar = None
             else:
                 print('Failed to download the user avatar. Use --youtube-api-key to fetch missing avatars via the YouTube Data API.')
@@ -489,7 +489,7 @@ def create_avatar_mask(size, scale):
     mask = mask.resize((size, size), Image.LANCZOS)
     return mask
 
-avatar_mask = create_avatar_mask(chat_avatar_size, 4)  # Draw at x4 scale, then downscale using Lanczos algorithm
+avatar_mask = create_avatar_mask(chat_avatar_size, 4)  # Draw at 4x scale, then downscale using Lanczos algorithm
 
 # Pre-download emojis
 if not skip_emojis:
@@ -530,7 +530,7 @@ if not skip_emojis:
         except:
             print(f"Error: Can't download emoji: {emoji_url}")
 
-# Create badge icons (TODO: load form SVG files)
+# Create badge icons (TODO: load from SVG file)
 badge_icons = {
     'MODERATOR': Image.open(f"{script_dir}/icons/badge-moderator-96.png").convert("RGBA").resize((chat_badge_size, chat_badge_size), Image.LANCZOS)
 }
@@ -541,18 +541,18 @@ current_message_time = 0
 current_animation_t = 0  # Animation factor (0.0 - start, 1.0 - end)
 
 def draw_chat():
-    # Clear all
+    # Clear image
     if args.transparent:
         draw.rectangle([0, 0, width, height], fill=(0, 0, 0, 0))
     else:
         draw.rectangle([0, 0, width, height], fill=chat_background)
 
     #
-    # 1. Calculate messages layout
+    # 1. Calculate message layout
     #
     messages_layout = []
     y = 0
-    for i in range(current_message_index, -1, -1):  # from current message towards the first one (inclusive)
+    for i in range(current_message_index, -1, -1):  # from the current message to the first one (inclusive)
         message = messages[i]
 
         # - Avatar
@@ -582,11 +582,11 @@ def draw_chat():
         run_y = int(chat_avatar_size / 2)
         for run_type, run_content in message[MESSAGE_RUNS]:
             if run_type == 0:  # text
-                for match in re.finditer(r'\S+\s*', run_content):  # Iterate over words (whitespace included)
+                for match in re.finditer(r'\S+\s*', run_content):  # Iterate over words (including whitespace)
                     word = match.group()
                     word_width = chat_message_font.getbbox(word)[2]
 
-                    # Handle line wrap
+                    # Handle line wrapping
                     if (run_x + word_width) > chat_inner_width:
                         run_x = author_x
                         run_y += chat_line_height
@@ -606,7 +606,7 @@ def draw_chat():
                 emoji_width += chat_emoji_margin  # Margin left
                 emoji_width += chat_emoji_margin  # Margin right
 
-                # Handle line wrap
+                # Handle line wrapping
                 if (run_x + emoji_width) > chat_inner_width:
                     run_x = author_x
                     run_y += chat_line_height
@@ -617,13 +617,13 @@ def draw_chat():
                 run_x += emoji_width
 
         # Store layout information
-        # TODO: Spacing between lines with emojis doesn't match the reference
+        # TODO: Spacing between lines with emojis doesn't match reference
         message_height = 0
         message_height += chat_message_padding  # Top 4px padding
         if line_count == 1:
             message_height += chat_avatar_size  # First line is always the size of the avatar
         elif line_count == 2:
-            message_height += chat_avatar_size + chat_font_size  # Last line is always equals to the font size
+            message_height += chat_avatar_size + chat_font_size  # Last line is always equal to the font size
         else:
             message_height += chat_avatar_size + ((line_count-2) * chat_line_height) + chat_font_size
         message_height += chat_message_padding  # Bottom 4px padding
@@ -632,15 +632,15 @@ def draw_chat():
         no_more_space = y > height
 
         if not args.no_clip and no_more_space:
-            break  # no more space for messages
+            break  # No more space for messages
 
         messages_layout.append((i, message_height, avatar, avatar_x, avatar_y, author, author_x, author_y, author_color, badge, badge_x, badge_y, runs))
 
         if args.no_clip and no_more_space:
-            break  # no more space for messages
+            break  # No more space for messages
 
     #
-    # 2. Draw calculated messages layout
+    # 2. Draw calculated message layout
     #
     y = height
     for i, message_height, avatar, avatar_x, avatar_y, author, author_x, author_y, author_color, badge, badge_x, badge_y, runs in messages_layout:
@@ -673,7 +673,7 @@ def on_draw_chat_error(e):
     print(f"\nError while drawing chat: {e}")
     print("Exiting...")
 
-# Send frames to ffmpeg
+# Send frames to FFmpeg
 redraw = True
 animation_active = False
 num_frames = round(fps * duration_seconds)
@@ -711,7 +711,7 @@ for i in range(num_frames):
             break
         redraw = False
 
-    # Write raw RGB bytes to ffmpeg
+    # Write raw RGB bytes to FFmpeg
     ffmpeg.stdin.write(img.tobytes())
 
     # Print progress
